@@ -1,0 +1,5 @@
+use_aspect: true
+update_freq: 1
+file: smb_simple_param.txt
+array: []
+solar_elevation: 60.0

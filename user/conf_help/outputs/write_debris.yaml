@@ -1,0 +1,12 @@
+add_topography:
+  Type: boolean
+  Units: -
+  Description: Add topography as background to the output
+toggle_particles:
+  Type: boolean
+  Units: -
+  Description: Toggle the visibility of particles in the output
+vars_to_save:
+  Type: list
+  Units: -
+  Description: List of variables to save in the output

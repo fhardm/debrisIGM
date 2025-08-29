@@ -1,0 +1,17 @@
+use_aspect:
+  Type: boolean
+  Description: Toggle the use of aspect in the model
+update_freq:
+  Type: int
+  Units: years
+  Description: Frequency of module updates
+file:
+  Type: str
+  Description: Path to the smb file
+array:
+  Type: list
+  Description: Array of smb parameters ("time", "gradabl", "gradacc", "ela", "accmax")
+solar_elevation:
+  Type: float
+  Units: degrees
+  Description: Solar elevation angle

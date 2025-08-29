@@ -1,0 +1,13 @@
+add_topography: true
+toggle_particles: false
+vars_to_save:
+- particle_x
+- particle_y
+- particle_z
+- particle_r
+- particle_t
+- particle_englt
+- particle_topg
+- particle_thk
+- particle_w
+- particle_srcid

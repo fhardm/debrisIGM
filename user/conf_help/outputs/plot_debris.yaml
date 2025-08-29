@@ -1,0 +1,24 @@
+editor:
+  Type: str
+  Description: Editor to use for plotting
+live:
+  Type: bool
+  Description: Toggle live plotting
+particles:
+  Type: bool
+  Description: Toggle plotting particle data
+var:
+  Type: str
+  Description: Variable to plot
+var_max:
+  Type: float
+  Description: Maximum value of the variable for color scaling
+part_var:
+  Type: str
+  Description: Particle variable to plot
+part_var_min:
+  Type: float
+  Description: Minimum value of the particle variable for color scaling
+part_var_max:
+  Type: float
+  Description: Maximum value of the particle variable for color scaling

@@ -1,0 +1,66 @@
+seeding_type:
+  Type: str
+  Description: Type of seeding implementation
+seeding_area_file:
+  Type: str
+  Description: File path to the seeding area shapefile
+seeding_delay:
+  Type: int
+  Units: years
+  Description: Delay before seeding starts
+frequency_seeding:
+  Type: int
+  Units: years
+  Description: Frequency of seeding
+density_seeding:
+  Type: list
+  Units: mm per year
+  Description: Debris input rate, definable per year as a list
+seed_slope:
+  Type: float
+  Units: degrees
+  Description: Minimum slope angle condition for seeding
+seed_thk:
+  Type: float
+  Units: m
+  Description: Maximum ice thickness condition for seeding
+initial_rockfall:
+  Type: bool
+  Description: Toggle initial rockfall scheme
+max_runout:
+  Type: float
+  Description: Maximum runout distance after initial rockfall (relative to distance travelled by initial rockfall)
+slope_correction:
+  Type: bool
+  Description: Toggle correction of debris input for surface area variations caused by slope
+tracking_method:
+  Type: str
+  Description: Method for tracking debris movement
+aggregate_immobile_particles:
+  Type: bool
+  Description: Toggle aggregation of immobile off-glacier particles, aggregates particles into 1 particle per pixel
+moraine_builder:
+  Type: bool
+  Description: Toggle moraine building from off-glacier particles & feedback into bed topography
+latdiff_beta:
+  Type: float
+  Description: Lateral diffusion coefficient for supraglacial lateral debris transport
+smb_type:
+  Type: str
+  Description: Type of surface mass balance model (e.g. Anderson2016)
+smb_oestrem_D0:
+  Type: float
+  Units: m
+  Description: Oestrem (1959) characteristic debris thickness D0
+smb_h_eff:
+  Type: float
+  Units: m
+  Description: Compagno (2022) parameter for Oestrem curve
+smb_h_crit:
+  Type: float
+  Units: m
+  Description: Compagno (2022) parameter for Oestrem curve
+smb_k_debris:
+  Type: float
+  Units: m
+  Description: Compagno (2022) parameter for Oestrem curve
