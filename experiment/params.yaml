@@ -62,7 +62,7 @@ processes:
   debris_cover:
     smb_type: Anderson2016
     smb_oestrem_D0: 0.065
-    seeding_delay: 10
+    seeding_delay: 50
     seeding_type: conditions
     initial_rockfall: true
     max_runout: 0.5

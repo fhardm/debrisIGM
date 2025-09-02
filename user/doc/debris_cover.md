@@ -1,5 +1,15 @@
 ### <h1 align="center" id="title">IGM module `debris_cover` </h1>
 
+
+# How to use `debris_cover`
+
+Copy the three folders `data`, `experiment`, and `user` to your own directory and follow the [official documentation](https://igm-model.org/latest/hydra/custom_configurations/) on running custom modules.
+
+To change parameters, edit `params.yaml` in the `experiment` folder and see `user/conf` for default parameter values.
+
+Documentation for the output modules `plot_debris` and `write_debris` can be found in the same folder as this document (`user/doc`).
+
+
 # Description
 This IGM module aims to represent the dynamics of a debris-covered glacier. It uses Lagrangian particle tracking (adapted from the module `particles`) to simulate englacial and supraglacial debris transport, evaluating debris thickness and its feedback with surface mass balance.
 
