@@ -1,5 +1,6 @@
 # ignore all outputs
 outputs/*
 multirun/*
+analysis/*
 # ignore certain file types
 .pyc
