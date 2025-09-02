@@ -13,6 +13,7 @@ from igm.processes.particles.utils import get_weights_lagrange, get_weights_lege
 from deb_seeding import seeding_particles
 from utils import aggregate_immobile_particles
 from utils import moraine_builder
+from deb_processes import lateral_diffusion
 
 
 def deb_particles(cfg, state):
@@ -102,5 +103,7 @@ def deb_particles(cfg, state):
         if cfg.processes.debris_cover.moraine_builder and (state.t.numpy() - state.tlast_mb) == 0:
             state = moraine_builder(cfg, state)
             
-
+        if cfg.processes.debris_cover.latdiff_beta > 0:
+            # update the lateral diffusion of surface debris particles
+            state = lateral_diffusion(cfg, state)
     return state

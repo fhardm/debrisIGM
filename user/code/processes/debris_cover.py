@@ -11,14 +11,12 @@
 import tensorflow as tf
 from deb_seeding import initialize_seeding
 from deb_particles import deb_particles
-from deb_processes import lateral_diffusion
 from deb_smb_feedback import deb_thickness
 from deb_smb_feedback import deb_smb
 
 def initialize(cfg, state):
     state.particle = {}  # this is a dictionary to store the particles
     state.nparticle = {}  # this is a dictionary to store the new particles
-    # state.particle["ID"] = tf.Variable([],dtype=tf.int32)
     state.particle_attributes = ["ID", "x", "y", "z", "r", "w",
                  "t", "englt", "thk", "topg", "srcid"]
     for key in state.particle_attributes:
@@ -30,9 +28,6 @@ def update(cfg, state):
     if state.t.numpy() >= cfg.processes.time.start + cfg.processes.debris_cover.seeding_delay:
         # update the particle tracking by calling the particles function, adapted from module particles.py
         state = deb_particles(cfg, state)
-        if cfg.processes.debris_cover.latdiff_beta > 0:
-            # update the lateral diffusion of surface debris particles
-            state = lateral_diffusion(cfg, state)
         # update debris thickness based on particle count in grid cells (at every SMB update time step)
         state = deb_thickness(cfg, state)
         # update the mass balance (SMB) depending by debris thickness, using clean-ice SMB from smb_simple.py

@@ -4,11 +4,10 @@
 # Published under the GNU GPL (Version 3), check at the LICENSE file
 
 import numpy as np
-import os, sys, shutil
+import os, shutil
 import matplotlib.pyplot as plt
 import matplotlib
-import datetime, time
-import tensorflow as tf
+import time
 
 from igm.utils.math.getmag import getmag
 
