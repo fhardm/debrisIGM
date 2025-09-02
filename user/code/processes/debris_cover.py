@@ -8,13 +8,21 @@
 # their number in each grid cell is used to compute debris thickness by distributing the particle debris volume over the grid cell. 
 # Mass balance is adjusted based on debris thickness using a simple Oestrem curve.
 
-from user.code.processes.debris_cover.deb_seeding import initialize_seeding
-from user.code.processes.debris_cover.deb_particles import deb_particles
-from user.code.processes.debris_cover.deb_processes import lateral_diffusion
-from user.code.processes.debris_cover.deb_smb_feedback import deb_thickness
-from user.code.processes.debris_cover.deb_smb_feedback import deb_smb
+import tensorflow as tf
+from deb_seeding import initialize_seeding
+from deb_particles import deb_particles
+from deb_processes import lateral_diffusion
+from deb_smb_feedback import deb_thickness
+from deb_smb_feedback import deb_smb
 
 def initialize(cfg, state):
+    state.particle = {}  # this is a dictionary to store the particles
+    state.nparticle = {}  # this is a dictionary to store the new particles
+    # state.particle["ID"] = tf.Variable([],dtype=tf.int32)
+    state.particle_attributes = ["ID", "x", "y", "z", "r", "w",
+                 "t", "englt", "thk", "topg", "srcid"]
+    for key in state.particle_attributes:
+        state.particle[key] = tf.Variable([])
     # initialize the seeding
     state = initialize_seeding(cfg, state)
 

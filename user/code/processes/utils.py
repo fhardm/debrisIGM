@@ -112,17 +112,17 @@ def compute_mask_and_srcid(state, gdf):
 
 
 def aggregate_immobile_particles(state):
-    J = tf.greater(state.particle_thk, 1.0)
+    J = tf.greater(state.particle["thk"], 1.0)
     immobile_particles = tf.logical_not(J)
 
     # Mask immobile particles
     immobile_data = {
-        "x": tf.boolean_mask(state.particle_x, immobile_particles),
-        "y": tf.boolean_mask(state.particle_y, immobile_particles),
-        "w": tf.boolean_mask(state.particle_w, immobile_particles),
-        "t": tf.boolean_mask(state.particle_t, immobile_particles),
-        "englt": tf.boolean_mask(state.particle_englt, immobile_particles),
-        "srcid": tf.boolean_mask(state.particle_srcid, immobile_particles),
+        "x": tf.boolean_mask(state.particle["x"], immobile_particles),
+        "y": tf.boolean_mask(state.particle["y"], immobile_particles),
+        "w": tf.boolean_mask(state.particle["w"], immobile_particles),
+        "t": tf.boolean_mask(state.particle["t"], immobile_particles),
+        "englt": tf.boolean_mask(state.particle["englt"], immobile_particles),
+        "srcid": tf.boolean_mask(state.particle["srcid"], immobile_particles),
     }
 
     # Compute grid indices
@@ -147,13 +147,13 @@ def aggregate_immobile_particles(state):
 
     # Remove immobile particles
     for attr in state.particle_attributes:
-        arr = getattr(state, attr)
+        arr = state.particle[attr]
         # Remove elements where J is False by iterating only up to the length of J
         if arr.shape[0] != J.shape[0]:
             print("Failing attribute:", attr)
             print("Shape of attr:", state.ID.shape)
-            print("Shape of particle_x:", state.particle_x.shape)
-            print("Shape of particle_thk:", state.particle_thk.shape)
+            print("Shape of particle['x']:", state.particle["x"].shape)
+            print("Shape of particle['thk']:", state.particle["thk"].shape)
             # Only applies to the "ID" attribute, which needs unique values
             if attr == "ID":
                 # Calculate how many new IDs are needed
@@ -169,13 +169,13 @@ def aggregate_immobile_particles(state):
                     pad_values = tf.zeros([n_missing], dtype=arr.dtype)
                     arr = tf.concat([arr, pad_values], axis=0)
         arr_filtered = tf.boolean_mask(arr, J)
-        setattr(state, attr, arr_filtered)
+        state.particle[attr] = arr_filtered
 
     # Re-seed aggregated particles
     I = tf.greater(w_sum, 0)
     if tf.reduce_any(I):
         num_new_particles = tf.reshape(tf.cast(tf.size(tf.boolean_mask(state.X, I)), tf.float32), [1])
-        state.nID = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32)
+        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32)
         state.particle_counter.assign_add(num_new_particles)
 
         # Weighted averages for re-seeding
@@ -187,25 +187,42 @@ def aggregate_immobile_particles(state):
         # Get indices of grid cells where w_sum > 0
         idx = tf.where(I)
         idx_flat = tf.reshape(idx, [-1, 2])
-
         # Gather values for new particles
-        state.nparticle_x = tf.gather_nd(avg_x, idx_flat)
-        state.nparticle_y = tf.gather_nd(avg_y, idx_flat)
-        state.nparticle_z = tf.gather_nd(state.usurf, idx_flat)
-        state.nparticle_r = tf.ones_like(state.nparticle_x)
-        state.nparticle_w = tf.gather_nd(w_sum, idx_flat)
-        state.nparticle_t = tf.gather_nd(t_mean, idx_flat)
-        state.nparticle_englt = tf.gather_nd(englt_mean, idx_flat)
-        state.nparticle_thk = tf.gather_nd(state.thk, idx_flat)
-        state.nparticle_topg = tf.gather_nd(state.topg, idx_flat)
-        state.nparticle_srcid = tf.gather_nd(srcid_mean, idx_flat)
+        state.nparticle["x"] = tf.gather_nd(avg_x, idx_flat)
+        state.nparticle["y"] = tf.gather_nd(avg_y, idx_flat)
+        state.nparticle["z"] = tf.gather_nd(state.usurf, idx_flat)
+        state.nparticle["r"] = tf.ones_like(state.nparticle["x"])
+        state.nparticle["w"] = tf.gather_nd(w_sum, idx_flat)
+        state.nparticle["t"] = tf.gather_nd(t_mean, idx_flat)
+        state.nparticle["englt"] = tf.gather_nd(englt_mean, idx_flat)
+        state.nparticle["thk"] = tf.gather_nd(state.thk, idx_flat)
+        state.nparticle["topg"] = tf.gather_nd(state.topg, idx_flat)
+        state.nparticle["srcid"] = tf.gather_nd(srcid_mean, idx_flat)
 
         # Merge new particles with existing ones
         for attr in state.particle_attributes:
-            setattr(state, attr, tf.concat([getattr(state, attr), getattr(state, f"n{attr}")], axis=0))
+            state.particle[attr] = tf.concat([state.particle[attr], state.nparticle[attr]], axis=0)
 
     return state
 
+def moraine_builder(cfg, state):
+    # reset topography to initial state before re-evaluating the off-glacier debris thickness
+    state.topg = state.topg - state.debthick_offglacier
+
+    # set state.particle["r"] of all particles where state.particle["thk"] == 0 to 1
+    state.particle["r"] = tf.where(state.particle["thk"] == 0, tf.ones_like(state.particle["r"]), state.particle["r"])
+
+    # count particles in grid cells
+    state.engl_w_sum = count_particles(cfg, state)
+
+    # add the debris thickness of off-glacier particles to the grid cells
+    state.debthick_offglacier.assign(tf.reduce_sum(state.engl_w_sum, axis=0) / state.dx**2) # convert to m thickness by multiplying by representative volume (m3 debris per particle) and dividing by dx^2 (m2 grid cell area)
+    # apply off-glacier mask (where particle_thk < 0)
+    mask = state.thk > 0
+    state.debthick_offglacier.assign(tf.where(mask, 0.0, state.debthick_offglacier))
+    # add the resulting debris thickness to state.topg
+    state.topg = state.topg + state.debthick_offglacier
+    return state
 
 # Count surface particles in grid cells
 def count_particles(cfg, state):
@@ -213,14 +230,14 @@ def count_particles(cfg, state):
     Count surface and englacial particles within a grid cell.
 
     Parameters:
-    state (object): An object containing particle coordinates (particle_x, particle_y) and grid cell boundaries (X, Y).
+    state (object): An object containing particle coordinates (particle["x"], particle["y"]) and grid cell boundaries (X, Y).
 
     Returns:
-    engl_w_sum: A 3D array with the sum of particle debris volume (particle_w) of englacial particles in each grid cell, sorted into vertical bins.
+    engl_w_sum: A 3D array with the sum of particle debris volume (particle["w"]) of englacial particles in each grid cell, sorted into vertical bins.
     """
     # Compute grid indices for all particles
-    grid_particle_x = tf.cast(tf.floor(state.particle_x / state.dx), tf.int32)
-    grid_particle_y = tf.cast(tf.floor(state.particle_y / state.dx), tf.int32)
+    grid_particle_x = tf.cast(tf.floor(state.particle["x"] / state.dx), tf.int32)
+    grid_particle_y = tf.cast(tf.floor(state.particle["y"] / state.dx), tf.int32)
     # Create depth bins for each pixel
     depth_bins = tf.linspace(0.0, 1.0, cfg.processes.iceflow.numerics.Nz + 1)
 
@@ -230,13 +247,13 @@ def count_particles(cfg, state):
     # For each depth bin, mask and accumulate using tf ops
     for k in range(cfg.processes.iceflow.numerics.Nz + 1):
         if k < cfg.processes.iceflow.numerics.Nz:
-            bin_mask = tf.logical_and(state.particle_r >= depth_bins[k], state.particle_r < depth_bins[k + 1])
+            bin_mask = tf.logical_and(state.particle["r"] >= depth_bins[k], state.particle["r"] < depth_bins[k + 1])
         else:
-            bin_mask = state.particle_r >= depth_bins[k]
+            bin_mask = state.particle["r"] >= depth_bins[k]
 
         filtered_x = tf.boolean_mask(grid_particle_x, bin_mask)
         filtered_y = tf.boolean_mask(grid_particle_y, bin_mask)
-        filtered_w = tf.boolean_mask(state.particle_w, bin_mask)
+        filtered_w = tf.boolean_mask(state.particle["w"], bin_mask)
 
         indices = tf.stack([filtered_y, filtered_x], axis=1)
         # Add a depth index for the 3D tensor
@@ -245,14 +262,3 @@ def count_particles(cfg, state):
         engl_w_sum = tf.tensor_scatter_nd_add(engl_w_sum, indices_3d, filtered_w)
 
     return engl_w_sum
-
-
-def _rhs_to_zeta(cfg, rhs):
-    if cfg.processes.iceflow.numerics.vert_spacing == 1:
-        zeta = rhs
-    else:
-        DET = tf.sqrt(
-            1 + 4 * (cfg.processes.iceflow.numerics.vert_spacing - 1) * cfg.processes.iceflow.numerics.vert_spacing * rhs
-        )
-        zeta = (DET - 1) / (2 * (cfg.processes.iceflow.numerics.vert_spacing - 1))
-    return zeta

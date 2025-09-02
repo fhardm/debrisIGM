@@ -49,17 +49,16 @@ def run(cfg, state):
 
         vars_to_stack = []
         for var in cfg.outputs.write_debris.vars_to_save:
-            if var == "particle_x":
+            if var == "x":
                 vars_to_stack.append(
-                    getattr(state, var).numpy().astype(np.float64) + state.x[0].numpy().astype(np.float64),
+                    state.particle[var].numpy().astype(np.float64) + state.x[0].numpy().astype(np.float64),
                 )
-            elif var == "particle_y":
+            elif var == "y":
                 vars_to_stack.append(
-                    getattr(state, var).numpy().astype(np.float64) + state.y[0].numpy().astype(np.float64),
+                    state.particle[var].numpy().astype(np.float64) + state.y[0].numpy().astype(np.float64),
                 )
             else:
-                vars_to_stack.append(getattr(state, var))
-
+                vars_to_stack.append(state.particle[var])
         array = np.transpose(np.stack(vars_to_stack, axis=0))
         np.savetxt(f, array, delimiter=",", fmt="%.2f", header=",".join(cfg.outputs.write_debris.vars_to_save))
 
@@ -92,16 +91,16 @@ def run(cfg, state):
             filename = "particles_" + cfg.outputs.write_ncdf.output_file.replace(".nc", ".csv")
             vars_to_stack = []
             for var in cfg.outputs.write_debris.vars_to_save:
-                if var == "particle_x":
+                if var == "x":
                     vars_to_stack.append(
-                        getattr(state, var).numpy().astype(np.float64) + state.x[0].numpy().astype(np.float64),
+                        state.particle["x"].numpy().astype(np.float64) + state.x[0].numpy().astype(np.float64),
                     )
-                elif var == "particle_y":
+                elif var == "y":
                     vars_to_stack.append(
-                        getattr(state, var).numpy().astype(np.float64) + state.y[0].numpy().astype(np.float64),
+                        state.particle["y"].numpy().astype(np.float64) + state.y[0].numpy().astype(np.float64),
                     )
                 else:
-                    vars_to_stack.append(getattr(state, var))
+                    vars_to_stack.append(state.particle[var])
 
             array = tf.transpose(tf.stack(vars_to_stack, axis=0))
             np.savetxt(filename, array, delimiter=",", fmt="%.2f", header=",".join(cfg.outputs.write_debris.vars_to_save))

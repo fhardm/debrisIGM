@@ -73,14 +73,14 @@ def run(cfg, state):
                 extent=state.extent,
             )
         if cfg.outputs.plot_debris.particles:
-            if hasattr(state, "particle_x") and np.any(state.particle_srcid != 0):
+            if hasattr(state.particle, "x") and np.any(state.particle_srcid != 0):
                 if hasattr(state, "ip"):
                     state.ip.set_visible(False)
                 r = 1
                 state.ip = state.ax.scatter(
-                    x = state.particle_x[::r] + state.x[0],
-                    y = state.particle_y[::r] + state.y[0],
-                    c = state.particle_srcid[::r].numpy() / np.max(state.particle_srcid.numpy()), # normalized to 1
+                    x = state.particle["x"][::r] + state.x[0],
+                    y = state.particle["y"][::r] + state.y[0],
+                    c = state.particle["srcid"][::r].numpy() / np.max(state.particle["srcid"].numpy()), # normalized to 1
                     vmin=0,
                     vmax=1,
                     s=0.5,
@@ -91,9 +91,9 @@ def run(cfg, state):
                     state.ip.set_visible(False)
                 r = 1
                 state.ip = state.ax.scatter(
-                    x = state.particle_x[::r] + state.x[0],
-                    y = state.particle_y[::r] + state.y[0],
-                    c = vars(state)[cfg.outputs.plot_debris.part_var][::r].numpy(),
+                    x = state.particle["x"][::r] + state.x[0],
+                    y = state.particle["y"][::r] + state.y[0],
+                    c = state.particle[cfg.outputs.plot_debris.part_var][::r].numpy(),
                     vmin=cfg.outputs.plot_debris.part_var_min,
                     vmax=cfg.outputs.plot_debris.part_var_max,
                     s=0.5,

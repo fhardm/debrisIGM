@@ -6,8 +6,7 @@
 import tensorflow as tf
 
 from igm.utils.math.getmag import getmag
-
-from user.code.processes.debris_cover.utils import count_particles
+from utils import count_particles
 
 def deb_thickness(cfg, state):
     if (state.t.numpy() - state.tlast_mb) == 0:

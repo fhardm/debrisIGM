@@ -32,7 +32,7 @@ inputs:
   load_ncdf:
     input_file: input_Zmutt_50m_new.nc
     icemask_include: true
-    icemask_shapefile: /home/fhardm/anaconda3/envs/igm/igm_experiments/debris_IGM_test/data/icemask_Zmutt.shp
+    icemask_shapefile: /home/fhardm/anaconda3/envs/igm/debrisIGM/data/icemask_Zmutt.shp
     icemask_invert: true
     crop: true
     xmin: 389000
@@ -62,7 +62,7 @@ processes:
   debris_cover:
     smb_type: Anderson2016
     smb_oestrem_D0: 0.065
-    seeding_delay: 50
+    seeding_delay: 10
     seeding_type: conditions
     initial_rockfall: true
     max_runout: 0.5
@@ -110,19 +110,19 @@ outputs:
   write_debris:
     vars_to_save:
       - ID
-      - particle_x
-      - particle_y
-      - particle_z
-      - particle_r
-      - particle_t
-      - particle_englt
-      - particle_topg
-      - particle_thk
-      - particle_w
-      - particle_srcid
+      - x
+      - y
+      - z
+      - r
+      - t
+      - englt
+      - topg
+      - thk
+      - w
+      - srcid
   plot_debris:
     live: false
     var_max: 150
-    part_var: particle_r
+    part_var: r
     part_var_min: 0
     part_var_max: 1
