@@ -31,6 +31,7 @@ def initialize_seeding(cfg, state):
     state.tlast_seeding = -1.0e5000
     state.tcomp_particles = []
     state.particle_counter = tf.Variable([0], dtype=tf.float32)
+    state.volume_per_particle = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
 
     # initialize trajectories (if they do not exist already)
     if not hasattr(state.particle, 'x'):

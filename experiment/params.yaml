@@ -32,7 +32,7 @@ inputs:
   load_ncdf:
     input_file: input_Zmutt_50m_new.nc
     icemask_include: true
-    icemask_shapefile: /home/fhardm/anaconda3/envs/igm/debrisIGM/data/icemask_Zmutt.shp
+    icemask_shapefile: /home/fhardm/anaconda3/envs/igm/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
     icemask_invert: true
     crop: true
     xmin: 389000
@@ -107,6 +107,8 @@ outputs:
       - seeded_debris_volume
       - slope_rad
       - aspect_rad
+      - gridseed
+      - volume_per_particle
   write_debris:
     vars_to_save:
       - ID

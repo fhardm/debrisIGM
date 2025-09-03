@@ -6,7 +6,6 @@
 import tensorflow as tf
 import time
 
-from igm.utils.math.interpolate_bilinear_tf import interpolate_bilinear_tf
 from igm.processes.particles.utils_tf import interpolate_particles_2d
 from igm.processes.particles.utils import get_weights_lagrange, get_weights_legendre
 
