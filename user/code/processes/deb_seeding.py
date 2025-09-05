@@ -54,14 +54,12 @@ def initialize_seeding(cfg, state):
 
     # Grid seeding based on conditions, written by Andreas H., adapted by Florian H.
     if cfg.processes.debris_cover.seeding_type == "conditions":
-        # Start with all True, then apply slope condition
-        state.gridseed = tf.ones_like(state.thk, dtype=tf.bool)
         # Apply slope threshold (minimum slope where seeding still occurs)
         slope_mask = state.slope_rad > (cfg.processes.debris_cover.seed_slope / 180 * np.pi)
         # Apply ice thickness threshold (maximum ice thickness where seeding still occurs)
         thk_mask = state.thk < cfg.processes.debris_cover.seed_thk
         # Combine all masks
-        state.gridseed = tf.logical_and(state.gridseed, tf.logical_and(slope_mask, thk_mask))
+        state.gridseed = tf.logical_and(slope_mask, thk_mask)
 
     # Seeding based on shapefile, adapted from include_icemask (Andreas Henz)  
     elif cfg.processes.debris_cover.seeding_type == "shapefile":
@@ -175,7 +173,9 @@ def seeding_particles(cfg, state):
         # Apply ice thickness threshold
         thk_mask = state.thk < cfg.processes.debris_cover.seed_thk
         # Combine all masks
-        state.gridseed = tf.logical_and(state.gridseed, tf.logical_and(slope_mask, thk_mask))
+        state.gridseed = tf.logical_and(slope_mask, thk_mask)
+        if hasattr(state, 'icemask'):
+            state.gridseed = tf.logical_and(state.gridseed, state.icemask > 0)
 
     if cfg.processes.debris_cover.seeding_type == "csv_points":
         num_new_particles_scalar = tf.cast(tf.size(state.seeding_x), tf.float32)
