@@ -5,6 +5,7 @@
 
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 import rasterio
 
 from igm.utils.gradient.compute_gradient_tf import compute_gradient_tf
@@ -53,14 +54,12 @@ def initialize_seeding(cfg, state):
 
     # Grid seeding based on conditions, written by Andreas H., adapted by Florian H.
     if cfg.processes.debris_cover.seeding_type == "conditions":
-        # Start with all True, then apply slope condition
-        state.gridseed = tf.ones_like(state.thk, dtype=tf.bool)
         # Apply slope threshold (minimum slope where seeding still occurs)
         slope_mask = state.slope_rad > (cfg.processes.debris_cover.seed_slope / 180 * np.pi)
         # Apply ice thickness threshold (maximum ice thickness where seeding still occurs)
         thk_mask = state.thk < cfg.processes.debris_cover.seed_thk
         # Combine all masks
-        state.gridseed = tf.logical_and(state.gridseed, tf.logical_and(slope_mask, thk_mask))
+        state.gridseed = tf.logical_and(slope_mask, thk_mask)
 
     # Seeding based on shapefile, adapted from include_icemask (Andreas Henz)  
     elif cfg.processes.debris_cover.seeding_type == "shapefile":
@@ -122,11 +121,20 @@ def initialize_seeding(cfg, state):
 
     elif cfg.processes.debris_cover.seeding_type == "csv_points":
         # Read seeding points from the CSV file
-        x, y = read_seeding_points_from_csv(cfg.processes.debris_cover.seeding_area_file)
+        filepath = state.original_cwd.joinpath(cfg.core.folder_data, cfg.processes.debris_cover.seeding_area_file)
+        x, y = read_seeding_points_from_csv(filepath)
 
         # Assign the imported x and y coordinates to nparticle["x"] and nparticle["y"]
         state.seeding_x = x
         state.seeding_y = y
+    # Seeding from the a CSV file particles by seeding year: 
+    elif cfg.processes.debris_cover.seeding_type == "csv_filt":
+        # Read seeding points from the CSV file
+        filepath = state.original_cwd.joinpath(cfg.core.folder_data, cfg.processes.debris_cover.seeding_area_file)
+        df = pd.read_csv(filepath)
+        state.seeding_points_by_year = {}
+        for year in df['seeding_year'].unique():
+            state.seeding_points_by_year[int(year)] = df[df['seeding_year'] == year].copy()
 
     if hasattr(state, 'gridseed') and hasattr(state, 'icemask'):
         state.gridseed = tf.logical_and(state.gridseed, state.icemask > 0)
@@ -165,10 +173,13 @@ def seeding_particles(cfg, state):
         # Apply ice thickness threshold
         thk_mask = state.thk < cfg.processes.debris_cover.seed_thk
         # Combine all masks
-        state.gridseed = tf.logical_and(state.gridseed, tf.logical_and(slope_mask, thk_mask))
+        state.gridseed = tf.logical_and(slope_mask, thk_mask)
+        if hasattr(state, 'icemask'):
+            state.gridseed = tf.logical_and(state.gridseed, state.icemask > 0)
 
     if cfg.processes.debris_cover.seeding_type == "csv_points":
-        num_new_particles = tf.cast(tf.size(state.seeding_x), tf.float32)
+        num_new_particles_scalar = tf.cast(tf.size(state.seeding_x), tf.float32)
+        num_new_particles = tf.reshape(num_new_particles_scalar, [1])
         state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32) # particle ID
         state.particle_counter.assign_add(num_new_particles)
         state.nparticle["x"] = state.seeding_x - state.x[0]    # x position of the particle
@@ -200,6 +211,61 @@ def seeding_particles(cfg, state):
         state.nparticle["thk"] = tf.gather_nd(state.thk, grid_indices)
         state.nparticle["topg"] = tf.gather_nd(state.topg, grid_indices)
         state.nparticle["srcid"] = tf.gather_nd(state.srcid, grid_indices)
+
+    elif cfg.processes.debris_cover.seeding_type == "csv_filt":
+        # Getting the current year of simulation
+        current_time = state.t.numpy()
+        current_year_to_match = int(round(current_time / 5) * 5)
+
+        # Verify if there are seeding points for the current year
+        if current_year_to_match in state.seeding_points_by_year:
+            print(f"Adding debris particles for year {current_year_to_match}.")
+        
+            # Select DataFrame with the seeding points for the current year
+            df_year = state.seeding_points_by_year[current_year_to_match]
+
+            # Coordinates x, y to tf variables
+            seeding_x = tf.convert_to_tensor(df_year['x'].values, dtype=tf.float32)
+            seeding_y = tf.convert_to_tensor(df_year['y'].values, dtype=tf.float32)
+
+            num_new_particles_scalar = tf.cast(tf.size(seeding_x), tf.float32)
+            num_new_particles = tf.reshape(num_new_particles_scalar, [1])
+        
+            if num_new_particles_scalar > 0:
+                state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32)
+                state.particle_counter.assign_add(num_new_particles)
+                state.nparticle["x"] = seeding_x - state.x[0]
+                state.nparticle["y"] = seeding_y - state.y[0]
+
+                # Compute particle z positions based on the surface & x, y positions
+                indices = tf.expand_dims(
+                    tf.concat(
+                        [tf.expand_dims(state.nparticle["y"] / state.dx, axis=-1), tf.expand_dims(state.nparticle["x"] / state.dx, axis=-1)], axis=-1
+                    ),
+                    axis=0,
+                )
+                state.nparticle["z"] = interpolate_bilinear_tf(
+                    tf.expand_dims(tf.expand_dims(state.usurf, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+
+                state.nparticle["r"] = tf.ones_like(state.nparticle["x"])
+                grid_particle_x = tf.cast(tf.floor(state.nparticle["x"] / state.dx), tf.int32)
+                grid_particle_y = tf.cast(tf.floor(state.nparticle["y"] / state.dx), tf.int32)
+                grid_indices = tf.stack([grid_particle_y, grid_particle_x], axis=1)
+                state.nparticle["w"] = tf.gather_nd(state.volume_per_particle, grid_indices)
+                state.nparticle["t"] = tf.ones_like(state.nparticle["x"]) * state.t
+                state.nparticle["englt"] = tf.zeros_like(state.nparticle["x"])
+                state.nparticle["thk"] = tf.gather_nd(state.thk, grid_indices)
+                state.nparticle["topg"] = tf.gather_nd(state.topg, grid_indices)
+                state.nparticle["srcid"] = tf.gather_nd(state.srcid, grid_indices)
+        else:
+            print(f"No seeding points for year {current_year_to_match}.")
+            # If there are no points, initialization to avoid errors.
+            for attr in state.particle_attributes:
+                state.nparticle[attr] = tf.Variable([], dtype=tf.float32)
+            num_new_particles = tf.constant([0], dtype=tf.float32)
 
     else:
         # Seeding
