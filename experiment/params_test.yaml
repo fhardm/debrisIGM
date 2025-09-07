@@ -28,11 +28,14 @@ defaults:
 #   job:
 #     chdir: True
 
+core:
+  print_comp: true
+
 inputs:
   load_ncdf:
     input_file: input_Zmutt_50m_new.nc
     icemask_include: true
-    icemask_shapefile: /home/fhardm/anaconda3/envs/igm/igm_experiments/debrisIGM/data/icemask_Zmutt.shp
+    icemask_shapefile: /home/flo/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
     icemask_invert: true
     crop: true
     xmin: 389000
@@ -48,13 +51,13 @@ processes:
       - [ 1849,      0.009,     0.005,  3050,      2.0]
       - [ 1850,      0.009,     0.005,  3150,      2.0]
       - [ 2000,      0.009,     0.005,  3150,      2.0]
-      - [ 2349,      0.009,     0.005,  3150,      2.0]
-      - [ 2350,      0.009,     0.005,  3050,      2.0]
-      - [ 2800,      0.009,     0.005,  3050,      2.0]
-      - [ 3200,      0.009,     0.005,  3050,      2.0]
+      - [ 2149,      0.009,     0.005,  3150,      2.0]
+      - [ 2150,      0.009,     0.005,  3050,      2.0]
+      - [ 2600,      0.009,     0.005,  3050,      2.0]
+      - [ 3000,      0.009,     0.005,  3050,      2.0]
   time:
-    start: 0.0
-    end: 200.0
+    start: 1200.0
+    end: 3000.0
     save: 10.0
   avalanche:
     update_freq: 5
@@ -65,9 +68,9 @@ processes:
     seeding_delay: 50
     seeding_type: conditions
     initial_rockfall: true
-    max_runout: 0.5
+    max_runout: 0.0
     latdiff_beta: 0.0
-    seed_slope: 45
+    seed_slope: 40
     seed_thk: 20
     slope_correction: true
     frequency_seeding: 1
@@ -107,22 +110,25 @@ outputs:
       - seeded_debris_volume
       - slope_rad
       - aspect_rad
+      - gridseed
+      - volume_per_particle
   write_debris:
     vars_to_save:
       - ID
-      - particle_x
-      - particle_y
-      - particle_z
-      - particle_r
-      - particle_t
-      - particle_englt
-      - particle_topg
-      - particle_thk
-      - particle_w
-      - particle_srcid
+      - x
+      - y
+      - z
+      - r
+      - t
+      - englt
+      - topg
+      - thk
+      - w
+      - srcid
   plot_debris:
+    save: 50.0
     live: false
     var_max: 150
-    part_var: particle_r
+    part_var: r
     part_var_min: 0
     part_var_max: 1

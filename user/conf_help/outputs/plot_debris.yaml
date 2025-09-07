@@ -22,3 +22,6 @@ part_var_min:
 part_var_max:
   Type: float
   Description: Maximum value of the particle variable for color scaling
+save:
+  Type: float
+  Description: Time interval for saving plots

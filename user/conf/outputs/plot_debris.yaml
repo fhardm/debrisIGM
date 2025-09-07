@@ -6,3 +6,4 @@ var_max: 1000
 part_var: particle_r
 part_var_min: 0
 part_var_max: 1
+save: 10.0

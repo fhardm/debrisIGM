@@ -30,7 +30,11 @@ def initialize(cfg, state):
                 shutil.rmtree(file_path)
                 
     state.tcomp_plot2d = []
-
+    state.plot_debris_itsave = -1
+    state.plot_debris_save = np.ndarray.tolist(
+        np.arange(cfg.processes.time.start, cfg.processes.time.end, cfg.outputs.plot_debris.save)
+    ) + [cfg.processes.time.end]
+    
     state.fig = plt.figure(dpi=200)
     state.ax = state.fig.add_subplot(1, 1, 1)
     state.ax.axis("off")
@@ -40,7 +44,13 @@ def initialize(cfg, state):
 
 
 def run(cfg, state):
-    if state.saveresult:
+        # modify dt such that times of requested savings are reached exactly
+    if state.t in state.plot_debris_save:
+        state.savedebresult = True
+    else:
+        state.savedebresult = False
+        
+    if state.savedebresult:
         state.tcomp_plot2d.append(time.time())
 
         if cfg.outputs.plot_debris.var == "velbar_mag":
