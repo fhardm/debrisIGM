@@ -7,6 +7,25 @@ import tensorflow as tf
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point
+import os
+import igm
+
+igm_path = os.path.dirname(igm.__file__)
+particles_path = os.path.join(igm_path, "processes", "particles")
+interpolate_op = tf.load_op_library(os.path.join(particles_path, 'interpolate_2d', 'interpolate_2d.so'))
+
+def interpolate_2d_cuda(field, indices):
+    particles_tf = tf.squeeze(indices)
+    if field.ndim == 2:
+        field3d = tf.expand_dims(field, axis=0)  # Add depth dimension if missing (2D field)
+        interp_val = interpolate_op.interpolate2d(grid=field3d, particles=particles_tf)
+        return tf.squeeze(interp_val)
+    elif field.ndim != 3:
+        raise ValueError("Field must be a 2D or 3D tensor.")
+    else:
+        interp_val = interpolate_op.interpolate2d(grid=field, particles=particles_tf) # 3D field
+        return interp_val
+
 
 def read_shapefile(filepath):
     try:

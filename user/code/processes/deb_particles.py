@@ -6,7 +6,6 @@
 import tensorflow as tf
 import time
 
-from igm.processes.particles.utils_tf import interpolate_particles_2d
 from igm.processes.particles.utils import get_weights_lagrange, get_weights_legendre
 
 from deb_seeding import seeding_particles
@@ -16,6 +15,13 @@ from deb_processes import lateral_diffusion
 
 
 def deb_particles(cfg, state):
+    if cfg.processes.debris_cover.tracking.library == "cuda":
+        from igm.processes.particles.utils_cuda import interpolate_particles_2d       
+    elif cfg.processes.debris_cover.tracking.library == "cupy":
+        from igm.processes.particles.utils_cupy import interpolate_particles_2d       
+    elif cfg.processes.debris_cover.tracking.library == "tensorflow":
+        from igm.processes.particles.utils_tf import interpolate_particles_2d
+       
     if hasattr(state, "logger"):
         state.logger.info("Update particle tracking at time : " + str(state.t.numpy()))
     

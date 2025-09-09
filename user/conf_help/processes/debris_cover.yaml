@@ -25,14 +25,18 @@ seed_thk:
   Units: m
   Description: Maximum ice thickness condition for seeding
 initial_rockfall:
-  Type: bool
-  Description: Toggle initial rockfall scheme
+  Type: str
+  Description: Choose initial rockfall scheme
 max_runout:
   Type: float
   Description: Maximum runout distance after initial rockfall (relative to distance travelled by initial rockfall)
 slope_correction:
   Type: bool
   Description: Toggle correction of debris input for surface area variations caused by slope
+tracking:
+  library:
+    Type: str
+    Description: Library for particle tracking (e.g. tensorflow, cuda)
 tracking_method:
   Type: str
   Description: Method for tracking debris movement

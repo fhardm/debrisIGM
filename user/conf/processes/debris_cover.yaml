@@ -5,9 +5,11 @@ frequency_seeding: 1
 density_seeding: []
 seed_slope: 45
 seed_thk: 20
-initial_rockfall: true
+initial_rockfall: default
 max_runout: 0.5 # relative to initial rockfall distance (0.5 = total of 1.5x initial distance)
 slope_correction: true
+tracking:
+  library: tensorflow
 tracking_method: 3d
 aggregate_immobile_particles: true
 moraine_builder: true

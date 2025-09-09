@@ -15,7 +15,6 @@ from igm.utils.math.interpolate_bilinear_tf import interpolate_bilinear_tf
 from utils import read_shapefile
 from utils import compute_mask_and_srcid
 from utils import read_seeding_points_from_csv
-from deb_processes import initial_rockfall
 
 def initialize_seeding(cfg, state):
     # initialize the debris variables
@@ -303,8 +302,12 @@ def seeding_particles(cfg, state):
         state.seeded_particles = tf.size(state.nparticle["x"])
         # Calculate the sum of seeded debris volume
         state.seeded_debris_volume = tf.reduce_sum(state.nparticle["w"])
-
-        if cfg.processes.debris_cover.initial_rockfall:
+        
+        if cfg.processes.debris_cover.initial_rockfall == "default":
+            from deb_processes import initial_rockfall
+            state = initial_rockfall(cfg, state)
+        elif cfg.processes.debris_cover.initial_rockfall == "simple":
+            from deb_processes import initial_rockfall_simple as initial_rockfall
             state = initial_rockfall(cfg, state)
 
         if cfg.processes.debris_cover.seeding_type == "slope_highres":
