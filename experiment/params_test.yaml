@@ -63,18 +63,11 @@ processes:
     update_freq: 5
     angleOfRepose: 45.0
   debris_cover:
-    smb_type: Anderson2016
-    smb_oestrem_D0: 0.065
-    seeding_delay: 50
-    seeding_type: conditions
-    initial_rockfall: true
-    max_runout: 0.0
-    latdiff_beta: 0.0
-    seed_slope: 40
-    seed_thk: 20
-    slope_correction: true
-    frequency_seeding: 1
-    density_seeding:
+    seeding:
+      type: conditions
+      delay: 50
+      frequency: 1
+      density:
       - ["time", "d_in"]
       - [ 1200,     1.0]
       - [ 1849,     1.0]
@@ -82,8 +75,20 @@ processes:
       - [ 2349,     1.0]
       - [ 2350,     1.0]
       - [ 2800,     1.0]
-    aggregate_immobile_particles: true
-    moraine_builder: true
+      slope_threshold: 40
+      thk_threshold: 20
+      initial_rockfall: simple
+      max_runout: 0.0
+      slope_correction: true
+    tracking:
+      library: tensorflow
+      method: 3d
+      aggregate_immobile_particles: true
+      moraine_builder: true
+      latdiff_beta: 0.0
+    smb:
+      type: Anderson2016
+      oestrem_D0: 0.065
 
 outputs:
   write_ncdf:

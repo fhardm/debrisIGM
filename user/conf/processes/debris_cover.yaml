@@ -1,21 +1,23 @@
-seeding_type: conditions
-seeding_area_file: debrismask.shp
-seeding_delay: 50
-frequency_seeding: 1
-density_seeding: []
-seed_slope: 45
-seed_thk: 20
-initial_rockfall: default
-max_runout: 0.5 # relative to initial rockfall distance (0.5 = total of 1.5x initial distance)
-slope_correction: true
+seeding:
+  type: conditions
+  area_file: debrismask.shp
+  delay: 50
+  frequency: 1
+  density: []
+  slope_threshold: 45
+  thk_threshold: 20
+  initial_rockfall: default
+  max_runout: 0.5 # relative to initial rockfall distance (0.5 = total of 1.5x initial distance)
+  slope_correction: true
 tracking:
   library: tensorflow
-tracking_method: 3d
-aggregate_immobile_particles: true
-moraine_builder: true
-latdiff_beta: 0
-smb_type: Anderson2016
-smb_oestrem_D0: 0.065
-smb_h_eff: 0.016
-smb_h_crit: 0.036
-smb_k_debris: 0.03
+  method: 3d
+  aggregate_immobile_particles: true
+  moraine_builder: true
+  latdiff_beta: 0
+smb:
+  type: Anderson2016
+  oestrem_D0: 0.065
+  h_eff: 0.016
+  h_crit: 0.036
+  k_debris: 0.03

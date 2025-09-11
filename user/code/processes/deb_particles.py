@@ -24,8 +24,8 @@ def deb_particles(cfg, state):
        
     if hasattr(state, "logger"):
         state.logger.info("Update particle tracking at time : " + str(state.t.numpy()))
-    
-    if (state.t.numpy() - state.tlast_seeding) >= cfg.processes.debris_cover.frequency_seeding:
+
+    if (state.t.numpy() - state.tlast_seeding) >= cfg.processes.debris_cover.seeding.frequency:
         seeding_particles(cfg, state)
 
         # merge the new seeding points with the former ones
@@ -67,7 +67,7 @@ def deb_particles(cfg, state):
         state.particle["x"] += state.dt * tf.reduce_sum(weights * u, axis=0)
         state.particle["y"] += state.dt * tf.reduce_sum(weights * v, axis=0)
         
-        if cfg.processes.debris_cover.tracking_method == "simple":
+        if cfg.processes.debris_cover.tracking.method == "simple":
             # adjust the relative height within the ice column with smb
             state.particle["r"] = tf.where(
                 thk > 0.1,
@@ -76,7 +76,7 @@ def deb_particles(cfg, state):
             )
             state.particle["z"] = topg + thk * state.particle["r"]
 
-        elif cfg.processes.debris_cover.tracking_method == "3d":
+        elif cfg.processes.debris_cover.tracking.method == "3d":
             # uses the vertical velocity w computed in the vert_flow module
             state.particle["z"] += state.dt * tf.reduce_sum(weights * w, axis=0)
             # make sure the particle vertically remain within the ice body
@@ -101,14 +101,14 @@ def deb_particles(cfg, state):
         state.tcomp_particles[-1] *= -1
         
         # aggregate immobile particles in the off-glacier area
-        if cfg.processes.debris_cover.aggregate_immobile_particles and (state.t.numpy() - state.tlast_seeding) == 0:
+        if cfg.processes.debris_cover.tracking.aggregate_immobile_particles and (state.t.numpy() - state.tlast_seeding) == 0:
             state = aggregate_immobile_particles(state)
         
         # build moraines from off-glacier particles and feed back into basal topography
-        if cfg.processes.debris_cover.moraine_builder and (state.t.numpy() - state.tlast_mb) == 0:
+        if cfg.processes.debris_cover.tracking.moraine_builder and (state.t.numpy() - state.tlast_mb) == 0:
             state = moraine_builder(cfg, state)
             
-        if cfg.processes.debris_cover.latdiff_beta > 0:
+        if cfg.processes.debris_cover.tracking.latdiff_beta > 0:
             # update the lateral diffusion of surface debris particles
             state = lateral_diffusion(cfg, state)
     return state

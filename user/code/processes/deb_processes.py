@@ -47,7 +47,7 @@ def initial_rockfall(cfg, state):
             )[0, :, 0]
 
         # Update moving_particles mask (remove particles that have reached a slope lower than the threshold in the previous iteration)
-        moving_particles = moving_particles & tf.math.greater_equal(particle_slope, cfg.processes.debris_cover.seed_slope / 180 * np.pi)
+        moving_particles = moving_particles & tf.math.greater_equal(particle_slope, cfg.processes.debris_cover.seeding.slope_threshold / 180 * np.pi)
 
         # Move only the particles that are still moving
         if tf.reduce_any(moving_particles):
@@ -63,7 +63,7 @@ def initial_rockfall(cfg, state):
     diff_y = state.nparticle["y"] - inity
     if cfg.processes.debris_cover.max_runout > 0:
         # Apply an additional runout factor to the differences and add to the positions
-        runout_factor = tf.random.uniform(tf.shape(diff_x), minval=0, maxval=cfg.processes.debris_cover.max_runout, dtype=diff_x.dtype)
+        runout_factor = tf.random.uniform(tf.shape(diff_x), minval=0, maxval=cfg.processes.debris_cover.seeding.max_runout, dtype=diff_x.dtype)
         state.nparticle["x"] += diff_x * runout_factor
         state.nparticle["y"] += diff_y * runout_factor
 
@@ -85,8 +85,8 @@ def initial_rockfall_simple(cfg, state):
     
     # Round state.aspect_rad to the nearest 45° (in radians)
     aspect_rounded = tf.round(state.aspect_rad / (np.pi / 4)) * (np.pi / 4)
-    slope_threshold = cfg.processes.debris_cover.seed_slope / 180 * np.pi
-    
+    slope_threshold = cfg.processes.debris_cover.seeding.slope_threshold / 180 * np.pi
+
     moving_particles_any = tf.reduce_any(moving_particles)
 
     while moving_particles_any and iteration_count < max_iterations:
@@ -109,9 +109,9 @@ def initial_rockfall_simple(cfg, state):
     diff_x = state.nparticle["x"] - initx
     diff_y = state.nparticle["y"] - inity
 
-    if cfg.processes.debris_cover.max_runout > 0:
+    if cfg.processes.debris_cover.seeding.max_runout > 0:
         # Apply an additional runout factor to the differences and add to the positions
-        runout_factor = tf.random.uniform(tf.shape(diff_x), minval=0, maxval=cfg.processes.debris_cover.max_runout, dtype=diff_x.dtype)
+        runout_factor = tf.random.uniform(tf.shape(diff_x), minval=0, maxval=cfg.processes.debris_cover.seeding.max_runout, dtype=diff_x.dtype)
         state.nparticle["x"] += diff_x * runout_factor
         state.nparticle["y"] += diff_y * runout_factor
 
@@ -152,7 +152,7 @@ def lateral_diffusion(cfg, state):
         )[0, :, 0]
 
     # Move the filtered particles in the aspect direction, scaled by slope and a custom factor beta
-    beta = cfg.processes.debris_cover.latdiff_beta  # Custom scaling factor
+    beta = cfg.processes.debris_cover.tracking.latdiff_beta  # Custom scaling factor
     displacement_x = beta * tf.math.sin(filtered_aspect) * tf.math.tan(filtered_slope) * state.dt
     displacement_y = beta * tf.math.cos(filtered_aspect) * tf.math.tan(filtered_slope) * state.dt
 

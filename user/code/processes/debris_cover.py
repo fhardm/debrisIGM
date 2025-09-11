@@ -25,7 +25,7 @@ def initialize(cfg, state):
     state = initialize_seeding(cfg, state)
 
 def update(cfg, state):
-    if state.t.numpy() >= cfg.processes.time.start + cfg.processes.debris_cover.seeding_delay:
+    if state.t.numpy() >= cfg.processes.time.start + cfg.processes.debris_cover.seeding.delay:
         # update the particle tracking by calling the particles function, adapted from module particles.py
         state = deb_particles(cfg, state)
         # update debris thickness based on particle count in grid cells (at every SMB update time step)

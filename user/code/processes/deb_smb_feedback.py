@@ -10,7 +10,7 @@ from utils import count_particles
 
 def deb_thickness(cfg, state):
     if (state.t.numpy() - state.tlast_mb) == 0:
-        if not cfg.processes.debris_cover.moraine_builder:
+        if not cfg.processes.debris_cover.tracking.moraine_builder:
             state.engl_w_sum = count_particles(cfg, state) # count particles and their volumes in grid cells
         state.debthick.assign(state.engl_w_sum[-1, :, :] / state.dx**2) # convert to m thickness by dividing representative volume (m3 debris per particle) by dx^2 (m2 grid cell area)
         state.debcon.assign(tf.reduce_sum(state.engl_w_sum[:-1, :, :], axis=0) / (state.dx**2 * state.thk)) # convert to m depth-averaged volumetric debris concentration by dividing representative volume (m3 debris per particle) by dx^2 (m2 grid cell area) and ice thickness thk
@@ -33,11 +33,11 @@ def deb_smb(cfg, state):
     if (state.t - state.tlast_mb) == 0:
         # adjust smb based on debris thickness
         if hasattr(state, "debthick"):
-            if cfg.processes.debris_cover.smb_type == "Anderson2016": # Anderson et al. (2016) debris-SMB adjustment (inverse relationship)
+            if cfg.processes.debris_cover.smb.type == "Anderson2016": # Anderson et al. (2016) debris-SMB adjustment (inverse relationship)
                 mask = state.debthick > 0
-                state.smb = tf.where(mask, state.smb * cfg.processes.debris_cover.smb_oestrem_D0 / (cfg.processes.debris_cover.smb_oestrem_D0 + state.debthick), state.smb)
-            elif cfg.processes.debris_cover.smb_type == "Compagno2022": # Compagno et al. (2022) debris-SMB adjustment including melt enhancement at thin debris thicknesses
-                mask_eff = tf.logical_and(state.debthick > cfg.processes.debris_cover.smb_h_eff, state.debthick > 0)
-                state.smb = tf.where(mask_eff, state.smb * (cfg.processes.debris_cover.smb_k_debris + cfg.processes.debris_cover.smb_h_crit)/(state.debthick + cfg.processes.debris_cover.smb_k_debris), state.smb)
-                state.smb = tf.where(~mask_eff, state.smb * ((cfg.processes.debris_cover.smb_k_debris + cfg.processes.debris_cover.smb_h_crit)/(cfg.processes.debris_cover.smb_h_eff + cfg.processes.debris_cover.smb_k_debris) * state.debthick/cfg.processes.debris_cover.smb_h_eff + (cfg.processes.debris_cover.smb_h_eff - state.debthick)/cfg.processes.debris_cover.smb_h_eff), state.smb)
+                state.smb = tf.where(mask, state.smb * cfg.processes.debris_cover.smb.oestrem_D0 / (cfg.processes.debris_cover.smb.oestrem_D0 + state.debthick), state.smb)
+            elif cfg.processes.debris_cover.smb.type == "Compagno2022": # Compagno et al. (2022) debris-SMB adjustment including melt enhancement at thin debris thicknesses
+                mask_eff = tf.logical_and(state.debthick > cfg.processes.debris_cover.smb.h_eff, state.debthick > 0)
+                state.smb = tf.where(mask_eff, state.smb * (cfg.processes.debris_cover.smb.k_debris + cfg.processes.debris_cover.smb.h_crit)/(state.debthick + cfg.processes.debris_cover.smb.k_debris), state.smb)
+                state.smb = tf.where(~mask_eff, state.smb * ((cfg.processes.debris_cover.smb.k_debris + cfg.processes.debris_cover.smb.h_crit)/(cfg.processes.debris_cover.smb.h_eff + cfg.processes.debris_cover.smb.k_debris) * state.debthick/cfg.processes.debris_cover.smb.h_eff + (cfg.processes.debris_cover.smb.h_eff - state.debthick)/cfg.processes.debris_cover.smb.h_eff), state.smb)
     return state

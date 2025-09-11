@@ -47,23 +47,23 @@ def initialize_seeding(cfg, state):
     state.aspect_rad = -tf.atan2(dzdx, -dzdy)
     
     # initialize d_in array
-    if cfg.processes.debris_cover.density_seeding != []:
+    if cfg.processes.debris_cover.seeding.density != []:
         # Convert to tf.Tensor instead of numpy array
-        state.d_in_array = tf.convert_to_tensor(cfg.processes.debris_cover.density_seeding[1:], dtype=tf.float32)
+        state.d_in_array = tf.convert_to_tensor(cfg.processes.debris_cover.seeding.density[1:], dtype=tf.float32)
 
     # Grid seeding based on conditions, written by Andreas H., adapted by Florian H.
-    if cfg.processes.debris_cover.seeding_type == "conditions":
+    if cfg.processes.debris_cover.seeding.type == "conditions":
         # Apply slope threshold (minimum slope where seeding still occurs)
-        slope_mask = state.slope_rad > (cfg.processes.debris_cover.seed_slope / 180 * np.pi)
+        slope_mask = state.slope_rad > (cfg.processes.debris_cover.seeding.slope_threshold / 180 * np.pi)
         # Apply ice thickness threshold (maximum ice thickness where seeding still occurs)
-        thk_mask = state.thk < cfg.processes.debris_cover.seed_thk
+        thk_mask = state.thk < cfg.processes.debris_cover.seeding.thk_threshold
         # Combine all masks
         state.gridseed = tf.logical_and(slope_mask, thk_mask)
 
     # Seeding based on shapefile, adapted from include_icemask (Andreas Henz)  
-    elif cfg.processes.debris_cover.seeding_type == "shapefile":
+    elif cfg.processes.debris_cover.seeding.type == "shapefile":
         # read_shapefile
-        gdf = read_shapefile(cfg.processes.debris_cover.seeding_area_file)
+        gdf = read_shapefile(cfg.processes.debris_cover.seeding.area_file)
 
         # Create a mask and source ID grid from shapefiles
         mask_values, srcid_values = compute_mask_and_srcid(state, gdf)
@@ -76,9 +76,9 @@ def initialize_seeding(cfg, state):
         if not tf.reduce_any(state.gridseed):
             raise ValueError("Shapefile not within icemask! Watch out for coordinate system!")
 
-    elif cfg.processes.debris_cover.seeding_type == "both":
+    elif cfg.processes.debris_cover.seeding.type == "both":
         # read_shapefile
-        gdf = read_shapefile(cfg.processes.debris_cover.seeding_area_file)
+        gdf = read_shapefile(cfg.processes.debris_cover.seeding.area_file)
 
         # Create a mask and source ID grid from shapefiles
         mask_values, srcid_values = compute_mask_and_srcid(state, gdf)
@@ -92,19 +92,19 @@ def initialize_seeding(cfg, state):
             raise ValueError("Shapefile not within icemask! Watch out for coordinate system!")
 
         # initialize d_in array
-        if cfg.processes.debris_cover.density_seeding != []:
-            state.d_in_array = tf.convert_to_tensor(cfg.processes.debris_cover.density_seeding[1:], dtype=tf.float32)
+        if cfg.processes.debris_cover.seeding.density != []:
+            state.d_in_array = tf.convert_to_tensor(cfg.processes.debris_cover.seeding.density[1:], dtype=tf.float32)
 
         # Apply slope threshold (minimum slope where seeding still occurs)
-        slope_mask = state.slope_rad > (cfg.processes.debris_cover.seed_slope / 180 * np.pi)
+        slope_mask = state.slope_rad > (cfg.processes.debris_cover.seeding.slope_threshold / 180 * np.pi)
         # Apply ice thickness threshold (maximum ice thickness where seeding still occurs)
-        thk_mask = state.thk < cfg.processes.debris_cover.seed_thk
+        thk_mask = state.thk < cfg.processes.debris_cover.seeding.thk_threshold
         # Combine all masks
         state.gridseed = tf.logical_and(state.gridseed, tf.logical_and(slope_mask, thk_mask))
 
-    elif cfg.processes.debris_cover.seeding_type == "slope_highres":
+    elif cfg.processes.debris_cover.seeding.type == "slope_highres":
         # Read the tif file
-        with rasterio.open(cfg.processes.debris_cover.seeding_area_file) as src:
+        with rasterio.open(cfg.processes.debris_cover.seeding.area_file) as src:
             print("Data type of src:", type(src))
             # Read the debris mask and reproject it to match the grid of X, Y
             debris_mask = src.read(1, out_shape=(state.X.shape[0], state.X.shape[1]), resampling=rasterio.enums.Resampling.average)
@@ -118,18 +118,18 @@ def initialize_seeding(cfg, state):
         state.gridseed_fraction = tf.constant(debris_mask, dtype=tf.float32)
         state.gridseed = tf.cast(state.gridseed_fraction > 0, dtype=tf.bool)
 
-    elif cfg.processes.debris_cover.seeding_type == "csv_points":
+    elif cfg.processes.debris_cover.seeding.type == "csv_points":
         # Read seeding points from the CSV file
-        filepath = state.original_cwd.joinpath(cfg.core.folder_data, cfg.processes.debris_cover.seeding_area_file)
+        filepath = state.original_cwd.joinpath(cfg.core.folder_data, cfg.processes.debris_cover.seeding.area_file)
         x, y = read_seeding_points_from_csv(filepath)
 
         # Assign the imported x and y coordinates to nparticle["x"] and nparticle["y"]
         state.seeding_x = x
         state.seeding_y = y
     # Seeding from the a CSV file particles by seeding year: 
-    elif cfg.processes.debris_cover.seeding_type == "csv_filt":
+    elif cfg.processes.debris_cover.seeding.type == "csv_filt":
         # Read seeding points from the CSV file
-        filepath = state.original_cwd.joinpath(cfg.core.folder_data, cfg.processes.debris_cover.seeding_area_file)
+        filepath = state.original_cwd.joinpath(cfg.core.folder_data, cfg.processes.debris_cover.seeding.area_file)
         df = pd.read_csv(filepath)
         state.seeding_points_by_year = {}
         for year in df['seeding_year'].unique():
@@ -149,34 +149,34 @@ def seeding_particles(cfg, state):
     significant ice, with a density of density_seeding particles per grid cell.
     """
     # Calculating volume per particle
-    if cfg.processes.debris_cover.density_seeding == []:
+    if cfg.processes.debris_cover.seeding.density == []:
         state.d_in = 1.0
     else:
         state.d_in = interp1d_tf(state.d_in_array[:, 0], state.d_in_array[:, 1], state.t)
 
-    state.volume_per_particle = cfg.processes.debris_cover.frequency_seeding * state.d_in/1000 * state.dx**2 # Volume per particle in m3
+    state.volume_per_particle = cfg.processes.debris_cover.seeding.frequency * state.d_in/1000 * state.dx**2 # Volume per particle in m3
 
     # Compute the gradient of the current land/ice surface
     dzdx, dzdy = compute_gradient_tf(state.usurf, state.dx, state.dx)
     state.slope_rad = tf.atan(tf.sqrt(dzdx**2 + dzdy**2))
     state.aspect_rad = -tf.atan2(dzdx, -dzdy)
 
-    if cfg.processes.debris_cover.slope_correction:
+    if cfg.processes.debris_cover.seeding.slope_correction:
         state.volume_per_particle = state.volume_per_particle / tf.cos(state.slope_rad)
     else:
         state.volume_per_particle = state.volume_per_particle * tf.ones_like(state.slope_rad)
 
-    if cfg.processes.debris_cover.seeding_type == "conditions" or cfg.processes.debris_cover.seeding_type == "both":
+    if cfg.processes.debris_cover.seeding.type == "conditions" or cfg.processes.debris_cover.seeding.type == "both":
         # Apply slope threshold
-        slope_mask = state.slope_rad > (cfg.processes.debris_cover.seed_slope / 180 * np.pi)
+        slope_mask = state.slope_rad > (cfg.processes.debris_cover.seeding.slope_threshold / 180 * np.pi)
         # Apply ice thickness threshold
-        thk_mask = state.thk < cfg.processes.debris_cover.seed_thk
+        thk_mask = state.thk < cfg.processes.debris_cover.seeding.thk_threshold
         # Combine all masks
         state.gridseed = tf.logical_and(slope_mask, thk_mask)
         if hasattr(state, 'icemask'):
             state.gridseed = tf.logical_and(state.gridseed, state.icemask > 0)
 
-    if cfg.processes.debris_cover.seeding_type == "csv_points":
+    if cfg.processes.debris_cover.seeding.type == "csv_points":
         num_new_particles_scalar = tf.cast(tf.size(state.seeding_x), tf.float32)
         num_new_particles = tf.reshape(num_new_particles_scalar, [1])
         state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32) # particle ID
@@ -211,7 +211,7 @@ def seeding_particles(cfg, state):
         state.nparticle["topg"] = tf.gather_nd(state.topg, grid_indices)
         state.nparticle["srcid"] = tf.gather_nd(state.srcid, grid_indices)
 
-    elif cfg.processes.debris_cover.seeding_type == "csv_filt":
+    elif cfg.processes.debris_cover.seeding.type == "csv_filt":
         # Getting the current year of simulation
         current_time = state.t.numpy()
         current_year_to_match = int(round(current_time / 5) * 5)
@@ -302,13 +302,13 @@ def seeding_particles(cfg, state):
         state.seeded_particles = tf.size(state.nparticle["x"])
         # Calculate the sum of seeded debris volume
         state.seeded_debris_volume = tf.reduce_sum(state.nparticle["w"])
-        
-        if cfg.processes.debris_cover.initial_rockfall == "default":
+
+        if cfg.processes.debris_cover.seeding.initial_rockfall == "default":
             from deb_processes import initial_rockfall
             state = initial_rockfall(cfg, state)
-        elif cfg.processes.debris_cover.initial_rockfall == "simple":
+        elif cfg.processes.debris_cover.seeding.initial_rockfall == "simple":
             from deb_processes import initial_rockfall_simple as initial_rockfall
             state = initial_rockfall(cfg, state)
 
-        if cfg.processes.debris_cover.seeding_type == "slope_highres":
+        if cfg.processes.debris_cover.seeding.type == "slope_highres":
             state.nparticle["w"] = state.nparticle["w"] * tf.boolean_mask(state.gridseed_fraction, I) # adjust the weight of the particle based on the fraction of the grid cell area inside the polygons

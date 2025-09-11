@@ -35,7 +35,7 @@ inputs:
   load_ncdf:
     input_file: input_Zmutt_50m_new.nc
     icemask_include: true
-    icemask_shapefile: /home/florian/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
+    icemask_shapefile: /home/fhardm/anaconda3/envs/igm/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
     icemask_invert: true
     crop: true
     xmin: 389000
@@ -57,26 +57,17 @@ processes:
       - [ 3000,      0.009,     0.005,  3050,      2.0]
   time:
     start: 1200.0
-    end: 1800.0
+    end: 1500.0
     save: 10.0
   avalanche:
     update_freq: 5
     angleOfRepose: 45.0
   debris_cover:
-    tracking:
-      library: cuda
-    smb_type: Anderson2016
-    smb_oestrem_D0: 0.065
-    seeding_delay: 50
-    seeding_type: conditions
-    initial_rockfall: simple
-    max_runout: 0.0
-    latdiff_beta: 0.0
-    seed_slope: 45
-    seed_thk: 20
-    slope_correction: true
-    frequency_seeding: 1
-    density_seeding:
+    seeding:
+      type: conditions
+      delay: 50
+      frequency: 1
+      density:
       - ["time", "d_in"]
       - [ 1200,     1.0]
       - [ 1849,     1.0]
@@ -84,8 +75,20 @@ processes:
       - [ 2349,     1.0]
       - [ 2350,     1.0]
       - [ 2800,     1.0]
-    aggregate_immobile_particles: true
-    moraine_builder: true
+      slope_threshold: 45
+      thk_threshold: 20
+      initial_rockfall: simple
+      max_runout: 0.0
+      slope_correction: true
+    tracking:
+      library: cuda
+      method: 3d
+      aggregate_immobile_particles: true
+      moraine_builder: true
+      latdiff_beta: 0.0
+    smb:
+      type: Anderson2016
+      oestrem_D0: 0.065
 
 outputs:
   write_ncdf:
