@@ -131,7 +131,8 @@ def compute_mask_and_srcid(state, gdf):
 
 
 def aggregate_immobile_particles(state):
-    J = tf.greater(state.particle["thk"], 1.0)
+    J = tf.logical_and(tf.greater(state.particle["thk"], 1.0), tf.greater(state.particle["vel"], 0.5)) # mobile particles (J) defined as having ice thickness > 1m and a velocity > 0.5 m/a
+    # J = tf.greater(state.particle["thk"], 1.0)
     immobile_particles = tf.logical_not(J)
 
     # Mask immobile particles
@@ -142,6 +143,7 @@ def aggregate_immobile_particles(state):
         "t": tf.boolean_mask(state.particle["t"], immobile_particles),
         "englt": tf.boolean_mask(state.particle["englt"], immobile_particles),
         "srcid": tf.boolean_mask(state.particle["srcid"], immobile_particles),
+        "vel": tf.boolean_mask(state.particle["vel"], immobile_particles),
     }
 
     # Compute grid indices
@@ -157,12 +159,14 @@ def aggregate_immobile_particles(state):
     t_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["t"])
     englt_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["englt"])
     srcid_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, tf.cast(immobile_data["srcid"], tf.float32))
+    vel_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["vel"])
     count = tf.tensor_scatter_nd_add(zeros, grid_indices, tf.ones_like(immobile_data["t"], dtype=tf.float32))
 
     # Compute means
     t_mean = tf.math.divide_no_nan(t_sum, count)
     englt_mean = tf.math.divide_no_nan(englt_sum, count)
     srcid_mean = tf.math.divide_no_nan(srcid_sum, count)
+    vel_mean = tf.math.divide_no_nan(vel_sum, count)
 
     # Remove immobile particles
     for attr in state.particle_attributes:
@@ -217,6 +221,7 @@ def aggregate_immobile_particles(state):
         state.nparticle["thk"] = tf.gather_nd(state.thk, idx_flat)
         state.nparticle["topg"] = tf.gather_nd(state.topg, idx_flat)
         state.nparticle["srcid"] = tf.gather_nd(srcid_mean, idx_flat)
+        state.nparticle["vel"] = tf.gather_nd(vel_mean, idx_flat)
 
         # Merge new particles with existing ones
         for attr in state.particle_attributes:

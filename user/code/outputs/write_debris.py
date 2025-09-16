@@ -36,10 +36,18 @@ def initialize(cfg, state):
             )
         )
         np.savetxt(ftt, array, delimiter=",", fmt="%.2f", header="x,y,z")
-
+    
+    state.write_debris_save = np.ndarray.tolist(
+        np.arange(cfg.processes.time.start, cfg.processes.time.end, cfg.outputs.write_debris.save)
+    ) + [cfg.processes.time.end]
 
 def run(cfg, state):
-    if state.saveresult:
+    if state.t in state.write_debris_save:
+        state.savedebresult = True
+    else:
+        state.savedebresult = False
+        
+    if state.savedebresult:
         state.tcomp_write_particles.append(time.time())
 
         f = os.path.join(
@@ -84,23 +92,3 @@ def run(cfg, state):
 
         state.tcomp_write_particles[-1] -= time.time()
         state.tcomp_write_particles[-1] *= -1
-
-
-        if cfg.outputs.write_debris.toggle_particles:
-            # Save particle properties to a CSV file (that will not be deleted when the next run starts)
-            filename = "particles_" + cfg.outputs.write_ncdf.output_file.replace(".nc", ".csv")
-            vars_to_stack = []
-            for var in cfg.outputs.write_debris.vars_to_save:
-                if var == "x":
-                    vars_to_stack.append(
-                        state.particle["x"].numpy().astype(np.float64) + state.x[0].numpy().astype(np.float64),
-                    )
-                elif var == "y":
-                    vars_to_stack.append(
-                        state.particle["y"].numpy().astype(np.float64) + state.y[0].numpy().astype(np.float64),
-                    )
-                else:
-                    vars_to_stack.append(state.particle[var])
-
-            array = tf.transpose(tf.stack(vars_to_stack, axis=0))
-            np.savetxt(filename, array, delimiter=",", fmt="%.2f", header=",".join(cfg.outputs.write_debris.vars_to_save))

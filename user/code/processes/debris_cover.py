@@ -18,7 +18,7 @@ def initialize(cfg, state):
     state.particle = {}  # this is a dictionary to store the particles
     state.nparticle = {}  # this is a dictionary to store the new particles
     state.particle_attributes = ["ID", "x", "y", "z", "r", "w",
-                 "t", "englt", "thk", "topg", "srcid"]
+                 "t", "englt", "thk", "topg", "srcid", "vel"]
     for key in state.particle_attributes:
         state.particle[key] = tf.Variable([])
     # initialize the seeding

@@ -293,6 +293,7 @@ def seeding_particles(cfg, state):
             "thk": thk_I,
             "topg": topg_I,
             "srcid": srcid_I,
+            "vel": tf.zeros_like(X_I),  # initial velocity set to zero
         }
 
         for attr in state.particle_attributes:

@@ -35,7 +35,7 @@ inputs:
   load_ncdf:
     input_file: input_Zmutt_50m_new.nc
     icemask_include: true
-    icemask_shapefile: /home/fhardm/anaconda3/envs/igm/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
+    icemask_shapefile: /home/florian/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
     icemask_invert: true
     crop: true
     xmin: 389000
@@ -56,8 +56,8 @@ processes:
       - [ 2600,      0.009,     0.005,  3050,      2.0]
       - [ 3000,      0.009,     0.005,  3050,      2.0]
   time:
-    start: 1200.0
-    end: 1500.0
+    start: 1100.0
+    end: 1600.0
     save: 10.0
   avalanche:
     update_freq: 5
@@ -97,26 +97,18 @@ outputs:
       - topg
       - usurf
       - thk
-      - thk_deb
       - smb
       - debthick
       - debthick_offglacier
       - debcon
       - debcon_vert
-      - debflux_engl
-      - debflux_supragl
       - debflux
       - velbar_mag
       - velsurf_mag
-      - uvelsurf
-      - vvelsurf
       - wvelsurf
       - seeded_particles
       - seeded_debris_volume
-      - slope_rad
-      - aspect_rad
       - gridseed
-      - volume_per_particle
   write_debris:
     vars_to_save:
       - ID
@@ -129,7 +121,7 @@ outputs:
       - topg
       - thk
       - w
-      - srcid
+    save: 50.0
   plot_debris:
     save: 50.0
     live: false

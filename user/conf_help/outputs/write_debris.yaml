@@ -1,12 +1,12 @@
 add_topography:
   Type: boolean
   Units: -
-  Description: Add topography as background to the output
-toggle_particles:
-  Type: boolean
-  Units: -
-  Description: Toggle the visibility of particles in the output
+  Description: Produce CSV files containing surface elevation at each pixel (usurf-xxxxxx.csv)
 vars_to_save:
   Type: list
   Units: -
-  Description: List of variables to save in the output
+  Description: List of variables to save in the output CSV files
+save:
+  Type: float
+  Units: years
+  Description: Time interval (in years) to save the output CSV files

@@ -1,5 +1,4 @@
-add_topography: true
-toggle_particles: false
+add_topography: false
 vars_to_save:
 - particle_x
 - particle_y
@@ -11,3 +10,4 @@ vars_to_save:
 - particle_thk
 - particle_w
 - particle_srcid
+save: 10.0
