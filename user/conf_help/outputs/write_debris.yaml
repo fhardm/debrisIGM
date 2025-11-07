@@ -10,3 +10,7 @@ save:
   Type: float
   Units: years
   Description: Time interval (in years) to save the output CSV files
+save_params_file:
+  Type: boolean
+  Units: -
+  Description: Whether to save a copy of the parameters file in the output directory

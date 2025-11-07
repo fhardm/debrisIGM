@@ -7,6 +7,9 @@ import tensorflow as tf
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Point
+import numpy as np
+from tqdm import tqdm
+import datetime
 import os
 import igm
 
@@ -92,7 +95,7 @@ def compute_mask_and_srcid(state, gdf):
     flat_Y = tf.reshape(state.Y, [-1])
 
     # Prepare tensors to store mask and srcid values
-    mask_values = tf.TensorArray(tf.float32, size=tf.shape(flat_X)[0])
+    mask_values = tf.TensorArray(tf.bool, size=tf.shape(flat_X)[0])
     srcid_values = tf.TensorArray(tf.int32, size=tf.shape(flat_X)[0])
 
     # Convert X and Y to numpy for shapely compatibility (required for Point)
@@ -117,11 +120,11 @@ def compute_mask_and_srcid(state, gdf):
                 srcid = int(gdf.iloc[poly_idx]['FID']) if 'FID' in gdf.columns else poly_idx
                 break  # if it is inside one polygon, don't check for others
 
-        mask_list.append(1.0 if inside_polygon else 0.0)
+        mask_list.append(inside_polygon)
         srcid_list.append(srcid)
 
     # Convert lists to tensors and reshape
-    mask_values = tf.convert_to_tensor(mask_list, dtype=tf.float32)
+    mask_values = tf.convert_to_tensor(mask_list, dtype=tf.bool)
     srcid_values = tf.convert_to_tensor(srcid_list, dtype=tf.int32)
 
     mask_values = tf.reshape(mask_values, state.X.shape)
@@ -149,56 +152,38 @@ def aggregate_immobile_particles(state):
     # Compute grid indices
     grid_indices = tf.stack([
         tf.cast(tf.floor(immobile_data["y"] / state.dx), tf.int32),
-        tf.cast(tf.floor(immobile_data["x"] / state.dx), tf.int32)
+        tf.cast(tf.floor(immobile_data["x"] / state.dx), tf.int32),
     ], axis=1)
 
     # Aggregate immobile particle data
     shape = tf.shape(state.usurf)
     zeros = tf.zeros(shape, dtype=tf.float32)
+    # zeros_int = tf.zeros(shape, dtype=tf.int32)
     w_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["w"])
     t_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["t"])
     englt_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["englt"])
-    srcid_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, tf.cast(immobile_data["srcid"], tf.float32))
+    # srcid_sum = tf.tensor_scatter_nd_add(zeros_int, grid_indices, immobile_data["srcid"])
     vel_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["vel"])
     count = tf.tensor_scatter_nd_add(zeros, grid_indices, tf.ones_like(immobile_data["t"], dtype=tf.float32))
 
     # Compute means
     t_mean = tf.math.divide_no_nan(t_sum, count)
     englt_mean = tf.math.divide_no_nan(englt_sum, count)
-    srcid_mean = tf.math.divide_no_nan(srcid_sum, count)
+    # srcid_mean = tf.cast(tf.math.divide_no_nan(srcid_sum, tf.cast(count, tf.int32)), tf.int32)
+    srcid_mean = tf.zeros_like(state.usurf, dtype=tf.int32)
     vel_mean = tf.math.divide_no_nan(vel_sum, count)
 
     # Remove immobile particles
     for attr in state.particle_attributes:
         arr = state.particle[attr]
-        # Remove elements where J is False by iterating only up to the length of J
-        if arr.shape[0] != J.shape[0]:
-            print("Failing attribute:", attr)
-            print("Shape of attr:", state.ID.shape)
-            print("Shape of particle['x']:", state.particle["x"].shape)
-            print("Shape of particle['thk']:", state.particle["thk"].shape)
-            # Only applies to the "ID" attribute, which needs unique values
-            if attr == "ID":
-                # Calculate how many new IDs are needed
-                n_missing = J.shape[0] - arr.shape[0]
-                if n_missing > 0:
-                    max_id = tf.reduce_max(arr) if tf.size(arr) > 0 else 0
-                    new_ids = tf.range(max_id + 1, max_id + 1 + n_missing, dtype=arr.dtype)
-                    arr = tf.concat([arr, new_ids], axis=0)
-            else:
-                # For other attributes, pad with zeros or appropriate default values
-                n_missing = J.shape[0] - arr.shape[0]
-                if n_missing > 0:
-                    pad_values = tf.zeros([n_missing], dtype=arr.dtype)
-                    arr = tf.concat([arr, pad_values], axis=0)
         arr_filtered = tf.boolean_mask(arr, J)
         state.particle[attr] = arr_filtered
 
     # Re-seed aggregated particles
     I = tf.greater(w_sum, 0)
     if tf.reduce_any(I):
-        num_new_particles = tf.reshape(tf.cast(tf.size(tf.boolean_mask(state.X, I)), tf.float32), [1])
-        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32)
+        num_new_particles = tf.reshape(tf.cast(tf.size(tf.boolean_mask(state.X, I)), tf.float64), [1])
+        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float64)
         state.particle_counter.assign_add(num_new_particles)
 
         # Weighted averages for re-seeding
@@ -286,3 +271,32 @@ def count_particles(cfg, state):
         engl_w_sum = tf.tensor_scatter_nd_add(engl_w_sum, indices_3d, filtered_w)
 
     return engl_w_sum
+
+def print_info_discrete(state):
+    if state.t % 50 == 0:
+        if not hasattr(state, "pbar_initialized") or not state.pbar_initialized:
+            if hasattr(state, "pbar"):
+                state.pbar.close()
+            state.pbar = tqdm(
+                desc=f"IGM", ascii=False, dynamic_ncols=True, bar_format="{desc} {postfix}"
+            )
+            state.pbar_initialized = True
+
+        dic_postfix = {
+            "🕒": datetime.datetime.now().strftime("%H:%M:%S"),
+            "🔄": f"{state.it:06.0f}",
+            "⏱ Time": f"{state.t.numpy():09.1f} yr",
+            "⏳ Step": f"{state.dt:04.2f} yr",
+        }
+        if hasattr(state, "dx"):
+            dic_postfix["❄️  Volume"] = (
+                f"{np.sum(state.thk) * (state.dx**2) / 10**9:108.2f} km³"
+            )
+        if hasattr(state, "particle"):
+            dic_postfix["# Particles"] = str(state.particle["x"].shape[0])
+
+        #        dic_postfix["💾 GPU Mem (MB)"] = tf.config.experimental.get_memory_info("GPU:0")['current'] / 1024**2
+
+        state.pbar.set_postfix(dic_postfix)
+        state.pbar.update(1)
+            

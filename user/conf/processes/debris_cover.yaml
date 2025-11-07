@@ -15,6 +15,7 @@ tracking:
   aggregate_immobile_particles: true
   moraine_builder: true
   latdiff_beta: 0
+  print_info: live
 smb:
   type: Anderson2016
   oestrem_D0: 0.065

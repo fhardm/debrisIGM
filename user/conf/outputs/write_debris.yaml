@@ -11,3 +11,4 @@ vars_to_save:
 - particle_w
 - particle_srcid
 save: 10.0
+save_params_file: true

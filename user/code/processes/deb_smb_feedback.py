@@ -16,9 +16,9 @@ def deb_thickness(cfg, state):
         state.debcon.assign(tf.reduce_sum(state.engl_w_sum[:-1, :, :], axis=0) / (state.dx**2 * state.thk)) # convert to m depth-averaged volumetric debris concentration by dividing representative volume (m3 debris per particle) by dx^2 (m2 grid cell area) and ice thickness thk
         if "debcon_vert" in cfg.outputs.write_ncdf.vars_to_save:
             state.debcon_vert.assign(tf.where(state.thk[None,:,:] > 0, state.engl_w_sum[:-1, :, :] / (state.dx**2 * state.thk[None,:,:]) * cfg.processes.iceflow.numerics.Nz, 0.0)) # vertically resolved debris concentration
-        debflux_supragl = state.debthick * getmag(state.uvelsurf,state.vvelsurf) # debris flux (supraglacial)
-        debflux_engl = tf.reduce_sum(state.engl_w_sum[:-1, :, :] * tf.sqrt(state.U**2 + state.V**2), axis=0) / state.dx**2 # debris flux (englacial)
-        state.debflux.assign(debflux_supragl + debflux_engl) # debris flux (englacial and supraglacial)
+        state.debflux_supragl = state.debthick * getmag(state.uvelsurf,state.vvelsurf) # debris flux (supraglacial)
+        state.debflux_engl = tf.reduce_sum(state.engl_w_sum[:-1, :, :] * tf.sqrt(state.U**2 + state.V**2), axis=0) / state.dx**2 # debris flux (englacial)
+        state.debflux.assign(state.debflux_supragl + state.debflux_engl) # debris flux (englacial and supraglacial)
         state.thk_deb.assign(state.thk) # ice thickness at the beginning of the time step
         mask = (state.smb > 0) | (state.thk == 0) # mask out off-glacier areas and accumulation area
         state.debthick.assign(tf.where(mask, 0.0, state.debthick))

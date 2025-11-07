@@ -61,7 +61,7 @@ def initial_rockfall(cfg, state):
     # Calculate the difference between the final and initial positions
     diff_x = state.nparticle["x"] - initx
     diff_y = state.nparticle["y"] - inity
-    if cfg.processes.debris_cover.max_runout > 0:
+    if cfg.processes.debris_cover.seeding.max_runout > 0:
         # Apply an additional runout factor to the differences and add to the positions
         runout_factor = tf.random.uniform(tf.shape(diff_x), minval=0, maxval=cfg.processes.debris_cover.seeding.max_runout, dtype=diff_x.dtype)
         state.nparticle["x"] += diff_x * runout_factor

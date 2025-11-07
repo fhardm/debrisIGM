@@ -67,7 +67,11 @@ def deb_particles(cfg, state):
         state.particle["x"] += state.dt * tf.reduce_sum(weights * u, axis=0)
         state.particle["y"] += state.dt * tf.reduce_sum(weights * v, axis=0)
         state.particle["vel"] = tf.sqrt(tf.reduce_sum(weights * u, axis=0)**2 + tf.reduce_sum(weights * v, axis=0)**2)
-        
+
+        # Ensure particle positions remain within the grid boundaries
+        state.particle["x"] = tf.clip_by_value(state.particle["x"], 0, state.x[-1] - state.x[0])
+        state.particle["y"] = tf.clip_by_value(state.particle["y"], 0, state.y[-1] - state.y[0])
+
         if cfg.processes.debris_cover.tracking.method == "simple":
             # adjust the relative height within the ice column with smb
             state.particle["r"] = tf.where(

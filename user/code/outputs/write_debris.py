@@ -27,7 +27,18 @@ def initialize(cfg, state):
                 shutil.rmtree(file_path)
 
     os.system( "echo rm -r " + "trajectories" + " >> clean.sh" )
-
+    
+    if cfg.outputs.write_debris.save_params_file:
+        hydra_overrides_path = os.path.join(".hydra", "overrides.yaml")
+        if os.path.exists(hydra_overrides_path):
+            with open(hydra_overrides_path, "r") as file:
+                first_line = file.readline()
+                if "=" in first_line:
+                    params_path = first_line.split("=", 1)[1].strip() + ".yaml"
+                    params_full_path = os.path.join(state.original_cwd, "experiment", params_path)
+                    if os.path.exists(params_full_path):
+                        shutil.copy(params_full_path, ".")
+        
     if cfg.outputs.write_debris.add_topography:
         ftt = os.path.join("trajectories", "topg.csv")
         array = tf.transpose(
@@ -42,8 +53,9 @@ def initialize(cfg, state):
     ) + [cfg.processes.time.end]
 
 def run(cfg, state):
-    if state.t in state.write_debris_save:
+    if state.write_debris_save and state.t.numpy() >= state.write_debris_save[0]:
         state.savedebresult = True
+        state.write_debris_save.pop(0)
     else:
         state.savedebresult = False
         
@@ -68,7 +80,8 @@ def run(cfg, state):
             else:
                 vars_to_stack.append(state.particle[var])
         array = np.transpose(np.stack(vars_to_stack, axis=0))
-        np.savetxt(f, array, delimiter=",", fmt="%.2f", header=",".join(cfg.outputs.write_debris.vars_to_save))
+        table_header = ",".join(cfg.outputs.write_debris.vars_to_save)
+        np.savetxt(f, array, delimiter=",", fmt="%.2f", header=table_header, comments='')
 
         ft = os.path.join("trajectories", "time.dat")
         with open(ft, "a") as f:

@@ -13,6 +13,8 @@ from deb_seeding import initialize_seeding
 from deb_particles import deb_particles
 from deb_smb_feedback import deb_thickness
 from deb_smb_feedback import deb_smb
+from utils import print_info_discrete
+from igm.common.utilities.printers import print_info
 
 def initialize(cfg, state):
     state.particle = {}  # this is a dictionary to store the particles
@@ -20,7 +22,10 @@ def initialize(cfg, state):
     state.particle_attributes = ["ID", "x", "y", "z", "r", "w",
                  "t", "englt", "thk", "topg", "srcid", "vel"]
     for key in state.particle_attributes:
-        state.particle[key] = tf.Variable([])
+        if key == "srcid":
+            state.particle[key] = tf.Variable([], dtype=tf.int32)
+        else:
+            state.particle[key] = tf.Variable([])
     # initialize the seeding
     state = initialize_seeding(cfg, state)
 
@@ -33,5 +38,10 @@ def update(cfg, state):
         # update the mass balance (SMB) depending by debris thickness, using clean-ice SMB from smb_simple.py
         state = deb_smb(cfg, state)
 
+        if cfg.processes.debris_cover.tracking.print_info == "live":
+            print_info(state)
+        elif cfg.processes.debris_cover.tracking.print_info == "discrete":
+            print_info_discrete(state)
+            
 def finalize(cfg, state):
     pass

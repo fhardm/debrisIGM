@@ -2,5 +2,6 @@
 outputs/*
 multirun/*
 analysis/*
+experiment/exp_struct/*
 # ignore certain file types
 .pyc

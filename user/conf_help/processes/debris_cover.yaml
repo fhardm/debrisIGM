@@ -50,6 +50,9 @@ tracking:
   latdiff_beta:
     Type: float
     Description: Lateral diffusion coefficient for supraglacial lateral debris transport
+  print_info:
+    Type: str
+    Description: Print information during simulation, either updating live or only at discrete intervals ("live", "discrete", "none")
 smb:
   type:
     Type: str

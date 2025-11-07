@@ -25,19 +25,27 @@ def initialize_seeding(cfg, state):
     if "debcon_vert" in cfg.outputs.write_ncdf.vars_to_save:
         state.debcon_vert = tf.Variable(tf.zeros((cfg.processes.iceflow.numerics.Nz,) + tuple(state.usurf.shape), dtype=tf.float32))
     state.debflux = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+    state.debflux_supragl = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+    state.debflux_engl = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.thk_deb = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.seeded_particles = tf.Variable([0], dtype=tf.float32)
     state.seeded_debris_volume = tf.Variable([0], dtype=tf.float32)
     state.tlast_seeding = -1.0e5000
     state.tcomp_particles = []
-    state.particle_counter = tf.Variable([0], dtype=tf.float32)
+    state.particle_counter = tf.Variable([0], dtype=tf.float64)
     state.volume_per_particle = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
 
     # initialize trajectories (if they do not exist already)
     if not hasattr(state.particle, 'x'):
         for attr in state.particle_attributes:
-            state.particle[attr] = tf.Variable([], dtype=tf.float32)
-        state.srcid = tf.zeros_like(state.thk, dtype=tf.float32)
+            if attr == "ID":
+                dtype = tf.float64
+            elif attr == "srcid":
+                dtype = tf.int32
+            else:
+                dtype = tf.float32
+            state.particle[attr] = tf.Variable([], dtype=dtype)
+        state.srcid = tf.zeros_like(state.thk, dtype=tf.int32)
 
     state.pswvelbase = tf.Variable(tf.zeros_like(state.thk), trainable=False)
     state.pswvelsurf = tf.Variable(tf.zeros_like(state.thk), trainable=False)
@@ -59,7 +67,9 @@ def initialize_seeding(cfg, state):
         thk_mask = state.thk < cfg.processes.debris_cover.seeding.thk_threshold
         # Combine all masks
         state.gridseed = tf.logical_and(slope_mask, thk_mask)
-
+        # Assign a unique pixel identifier to each grid cell
+        state.srcid = tf.reshape(tf.range(tf.size(state.thk), dtype=tf.int32), state.thk.shape)
+        
     # Seeding based on shapefile, adapted from include_icemask (Andreas Henz)  
     elif cfg.processes.debris_cover.seeding.type == "shapefile":
         # read_shapefile
@@ -70,7 +80,7 @@ def initialize_seeding(cfg, state):
 
         # Define debrismask and srcid
         state.gridseed = tf.constant(mask_values, dtype=tf.bool)
-        state.srcid = tf.constant(srcid_values, dtype=tf.float32)
+        state.srcid = tf.constant(srcid_values, dtype=tf.int32)
 
         # If gridseed is empty, raise an error
         if not tf.reduce_any(state.gridseed):
@@ -84,11 +94,11 @@ def initialize_seeding(cfg, state):
         mask_values, srcid_values = compute_mask_and_srcid(state, gdf)
 
         # define debrismask and srcid
-        state.gridseed = tf.constant(mask_values, dtype=tf.bool)
-        state.srcid = tf.constant(srcid_values, dtype=tf.float32)
+        state.gridseed_shp = tf.constant(mask_values, dtype=tf.bool)
+        state.srcid = tf.constant(srcid_values, dtype=tf.int32)
 
         # if gridseed is empty, raise an error
-        if not tf.reduce_any(state.gridseed):
+        if not tf.reduce_any(state.gridseed_shp):
             raise ValueError("Shapefile not within icemask! Watch out for coordinate system!")
 
         # initialize d_in array
@@ -100,7 +110,7 @@ def initialize_seeding(cfg, state):
         # Apply ice thickness threshold (maximum ice thickness where seeding still occurs)
         thk_mask = state.thk < cfg.processes.debris_cover.seeding.thk_threshold
         # Combine all masks
-        state.gridseed = tf.logical_and(state.gridseed, tf.logical_and(slope_mask, thk_mask))
+        state.gridseed = tf.logical_and(state.gridseed_shp, tf.logical_and(slope_mask, thk_mask))
 
     elif cfg.processes.debris_cover.seeding.type == "slope_highres":
         # Read the tif file
@@ -175,11 +185,14 @@ def seeding_particles(cfg, state):
         state.gridseed = tf.logical_and(slope_mask, thk_mask)
         if hasattr(state, 'icemask'):
             state.gridseed = tf.logical_and(state.gridseed, state.icemask > 0)
+        # For "both" type, combine with shapefile mask
+        if cfg.processes.debris_cover.seeding.type == "both":
+            state.gridseed = tf.logical_and(state.gridseed, state.gridseed_shp)
 
     if cfg.processes.debris_cover.seeding.type == "csv_points":
-        num_new_particles_scalar = tf.cast(tf.size(state.seeding_x), tf.float32)
+        num_new_particles_scalar = tf.cast(tf.size(state.seeding_x), tf.float64)
         num_new_particles = tf.reshape(num_new_particles_scalar, [1])
-        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32) # particle ID
+        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float64) # particle ID
         state.particle_counter.assign_add(num_new_particles)
         state.nparticle["x"] = state.seeding_x - state.x[0]    # x position of the particle
         state.nparticle["y"] = state.seeding_y - state.y[0]    # y position of the particle
@@ -227,11 +240,11 @@ def seeding_particles(cfg, state):
             seeding_x = tf.convert_to_tensor(df_year['x'].values, dtype=tf.float32)
             seeding_y = tf.convert_to_tensor(df_year['y'].values, dtype=tf.float32)
 
-            num_new_particles_scalar = tf.cast(tf.size(seeding_x), tf.float32)
+            num_new_particles_scalar = tf.cast(tf.size(seeding_x), tf.float64)
             num_new_particles = tf.reshape(num_new_particles_scalar, [1])
         
             if num_new_particles_scalar > 0:
-                state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32)
+                state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float64)
                 state.particle_counter.assign_add(num_new_particles)
                 state.nparticle["x"] = seeding_x - state.x[0]
                 state.nparticle["y"] = seeding_y - state.y[0]
@@ -269,8 +282,8 @@ def seeding_particles(cfg, state):
     else:
         # Seeding
         I = state.gridseed # conditions for seeding area: where thk > 0, smb > -2 and gridseed (defined in initialize) is True
-        num_new_particles = tf.reshape(tf.cast(tf.size(tf.boolean_mask(state.X, I)), tf.float32), [1])
-        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float32)
+        num_new_particles = tf.reshape(tf.cast(tf.size(tf.boolean_mask(state.X, I)), tf.float64), [1])
+        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float64)
         state.particle_counter.assign_add(num_new_particles)
 
         X_I = tf.boolean_mask(state.X, I)
@@ -313,3 +326,7 @@ def seeding_particles(cfg, state):
 
         if cfg.processes.debris_cover.seeding.type == "slope_highres":
             state.nparticle["w"] = state.nparticle["w"] * tf.boolean_mask(state.gridseed_fraction, I) # adjust the weight of the particle based on the fraction of the grid cell area inside the polygons
+
+    # Ensure particle positions remain within the grid boundaries
+    state.nparticle["x"] = tf.clip_by_value(state.nparticle["x"], 0, state.x[-1] - state.x[0])
+    state.nparticle["y"] = tf.clip_by_value(state.nparticle["y"], 0, state.y[-1] - state.y[0])
