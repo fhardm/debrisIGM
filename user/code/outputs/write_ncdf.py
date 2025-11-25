@@ -96,14 +96,14 @@ def run(cfg, state):
                 nc.pyproj_srs = state.pyproj_srs
 
             if hasattr(cfg.processes,'iceflow'):
-                if "Nz" in cfg.processes.iceflow.numerics:
-                    nc.createDimension("z", cfg.processes.iceflow.numerics.Nz)
+                if "Nz" in cfg.processes.debris_cover.tracking:
+                    nc.createDimension("z", cfg.processes.debris_cover.tracking.Nz)
                     E = nc.createVariable("z", np.dtype("float32").char, ("z",))
                     E.units = "m"
                     E.long_name = "z"
                     E.axis = "Z"
                     E[:] = np.arange(
-                        cfg.processes.iceflow.numerics.Nz
+                        cfg.processes.debris_cover.tracking.Nz
                     )  # TODO: fix this, that's not what we want
                     print("E:", E)
 

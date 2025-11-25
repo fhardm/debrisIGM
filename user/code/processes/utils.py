@@ -248,14 +248,14 @@ def count_particles(cfg, state):
     grid_particle_x = tf.cast(tf.floor(state.particle["x"] / state.dx), tf.int32)
     grid_particle_y = tf.cast(tf.floor(state.particle["y"] / state.dx), tf.int32)
     # Create depth bins for each pixel
-    depth_bins = tf.linspace(0.0, 1.0, cfg.processes.iceflow.numerics.Nz + 1)
+    depth_bins = tf.linspace(0.0, 1.0, cfg.processes.debris_cover.tracking.Nz + 1)
 
     # Initialize a 3D array to hold the counts for each depth bin
-    engl_w_sum = tf.zeros((cfg.processes.iceflow.numerics.Nz + 1,) + state.usurf.shape, dtype=tf.float32)
+    engl_w_sum = tf.zeros((cfg.processes.debris_cover.tracking.Nz + 1,) + state.usurf.shape, dtype=tf.float32)
 
     # For each depth bin, mask and accumulate using tf ops
-    for k in range(cfg.processes.iceflow.numerics.Nz + 1):
-        if k < cfg.processes.iceflow.numerics.Nz:
+    for k in range(cfg.processes.debris_cover.tracking.Nz + 1):
+        if k < cfg.processes.debris_cover.tracking.Nz:
             bin_mask = tf.logical_and(state.particle["r"] >= depth_bins[k], state.particle["r"] < depth_bins[k + 1])
         else:
             bin_mask = state.particle["r"] >= depth_bins[k]

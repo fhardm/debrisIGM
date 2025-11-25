@@ -35,6 +35,9 @@ seeding:
     Type: bool
     Description: Toggle correction of debris input for surface area variations caused by slope
 tracking:
+  Nz:
+    Type: int
+    Description: Number of vertical layers for debris tracking
   library:
     Type: str
     Description: Library for particle tracking (e.g. tensorflow, cuda)

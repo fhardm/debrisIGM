@@ -18,12 +18,12 @@ from utils import read_seeding_points_from_csv
 
 def initialize_seeding(cfg, state):
     # initialize the debris variables
-    state.engl_w_sum = tf.Variable(tf.zeros((cfg.processes.iceflow.numerics.Nz + 1,) + tuple(state.usurf.shape), dtype=tf.float32))
+    state.engl_w_sum = tf.Variable(tf.zeros((cfg.processes.debris_cover.tracking.Nz + 1,) + tuple(state.usurf.shape), dtype=tf.float32))
     state.debthick = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.debthick_offglacier = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.debcon = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     if "debcon_vert" in cfg.outputs.write_ncdf.vars_to_save:
-        state.debcon_vert = tf.Variable(tf.zeros((cfg.processes.iceflow.numerics.Nz,) + tuple(state.usurf.shape), dtype=tf.float32))
+        state.debcon_vert = tf.Variable(tf.zeros((cfg.processes.debris_cover.tracking.Nz,) + tuple(state.usurf.shape), dtype=tf.float32))
     state.debflux = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.debflux_supragl = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.debflux_engl = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))

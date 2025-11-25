@@ -10,6 +10,7 @@ seeding:
   max_runout: 0.5 # relative to initial rockfall distance (0.5 = total of 1.5x initial distance)
   slope_correction: true
 tracking:
+  Nz: 10
   library: tensorflow
   method: 3d
   aggregate_immobile_particles: true

@@ -102,6 +102,9 @@ def initial_rockfall_simple(cfg, state):
             aspect_values = tf.gather_nd(aspect_rounded, tf.stack([j, i], axis=-1))
             state.nparticle["x"] = tf.where(moving_particles, state.nparticle["x"] + tf.round(tf.math.sin(aspect_values)) * state.dx, state.nparticle["x"])
             state.nparticle["y"] = tf.where(moving_particles, state.nparticle["y"] + tf.round(tf.math.cos(aspect_values)) * state.dx, state.nparticle["y"])
+            # Ensure particles remain within the domain
+            state.nparticle["x"] = tf.clip_by_value(state.nparticle["x"], 0, state.x[-1] - state.x[0])
+            state.nparticle["y"] = tf.clip_by_value(state.nparticle["y"], 0, state.y[-1] - state.y[0])
         moving_particles_any = tf.reduce_any(moving_particles)
         iteration_count += 1
 
