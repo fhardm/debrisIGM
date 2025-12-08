@@ -88,6 +88,7 @@ processes:
       latdiff_beta: 0.0
       print_info: live
     smb:
+      debris_porosity: 0.3
       type: Anderson2016
       oestrem_D0: 0.065
 
