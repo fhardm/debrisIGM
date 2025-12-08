@@ -12,7 +12,7 @@ def deb_thickness(cfg, state):
     if (state.t.numpy() - state.tlast_mb) == 0:
         if not cfg.processes.debris_cover.tracking.moraine_builder:
             state.engl_w_sum = count_particles(cfg, state) # count particles and their volumes in grid cells
-        state.debthick.assign(state.engl_w_sum[-1, :, :] / state.dx**2) # convert to m thickness by dividing representative volume (m3 debris per particle) by dx^2 (m2 grid cell area)
+        state.debthick.assign(state.engl_w_sum[-1, :, :] / (state.dx**2 * (1 - cfg.processes.debris_cover.smb.debris_porosity))) # convert to m thickness by dividing representative volume (m3 debris per particle) by dx^2 (m2 grid cell area), divide with porosity to correct for pore space vs. pure debris volume
         state.debcon.assign(tf.reduce_sum(state.engl_w_sum[:-1, :, :], axis=0) / (state.dx**2 * state.thk)) # convert to m depth-averaged volumetric debris concentration by dividing representative volume (m3 debris per particle) by dx^2 (m2 grid cell area) and ice thickness thk
         if "debcon_vert" in cfg.outputs.write_ncdf.vars_to_save:
             state.debcon_vert.assign(tf.where(state.thk[None,:,:] > 0, state.engl_w_sum[:-1, :, :] / (state.dx**2 * state.thk[None,:,:]) * cfg.processes.debris_cover.tracking.Nz, 0.0)) # vertically resolved debris concentration

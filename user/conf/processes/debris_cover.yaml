@@ -18,6 +18,7 @@ tracking:
   latdiff_beta: 0
   print_info: live
 smb:
+  debris_porosity: 0.3
   type: Anderson2016
   oestrem_D0: 0.065
   h_eff: 0.016

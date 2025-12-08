@@ -57,6 +57,9 @@ tracking:
     Type: str
     Description: Print information during simulation, either updating live or only at discrete intervals ("live", "discrete", "none")
 smb:
+  debris_porosity:
+    Type: float
+    Description: Porosity of the debris layer (fraction of volume that is pore space), 1.0 = all pore space, 0.0 = no pore space; default = 0.3 (from Anderson & Anderson (2016), Nicholson et al. (2018))
   type:
     Type: str
     Description: Type of surface mass balance model (e.g. Anderson2016)
