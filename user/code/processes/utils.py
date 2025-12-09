@@ -225,7 +225,7 @@ def moraine_builder(cfg, state):
     state.engl_w_sum = count_particles(cfg, state)
 
     # add the debris thickness of off-glacier particles to the grid cells
-    state.debthick_offglacier.assign(tf.reduce_sum(state.engl_w_sum, axis=0) / state.dx**2) # convert to m thickness by multiplying by representative volume (m3 debris per particle) and dividing by dx^2 (m2 grid cell area)
+    state.debthick_offglacier.assign(tf.reduce_sum(state.engl_w_sum, axis=0) / (state.dx**2 * (1 - cfg.processes.debris_cover.smb.debris_porosity))) # convert to m thickness by multiplying by representative volume (m3 debris per particle), dividing by dx^2 (m2 grid cell area) and correcting for porosity
     # apply off-glacier mask (where particle_thk < 0)
     mask = state.thk > 0
     state.debthick_offglacier.assign(tf.where(mask, 0.0, state.debthick_offglacier))
