@@ -8,9 +8,9 @@ import numpy as np
 import pandas as pd
 import rasterio
 
-from igm.utils.gradient.compute_gradient_tf import compute_gradient_tf
-from igm.utils.math.interp1d_tf import interp1d_tf
-from igm.utils.math.interpolate_bilinear_tf import interpolate_bilinear_tf
+from math_utils.compute_gradient_tf import compute_gradient_tf
+from math_utils.interp1d_tf import interp1d_tf
+from math_utils.interpolate_bilinear_tf import interpolate_bilinear_tf
 
 from utils import read_shapefile
 from utils import compute_mask_and_srcid

@@ -9,8 +9,8 @@ import os, sys, shutil
 import time
 import tensorflow as tf
 
-from igm.utils.gradient.compute_gradient_tf import compute_gradient_tf
-from igm.utils.math.interp1d_tf import interp1d_tf
+from math_utils.compute_gradient_tf import compute_gradient_tf
+from math_utils.interp1d_tf import interp1d_tf
 
 
 def initialize(cfg, state):

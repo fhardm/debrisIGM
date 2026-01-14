@@ -6,7 +6,7 @@
 import tensorflow as tf
 import numpy as np
 
-from igm.utils.math.interpolate_bilinear_tf import interpolate_bilinear_tf
+from math_utils.interpolate_bilinear_tf import interpolate_bilinear_tf
 from utils import interpolate_2d_cuda
 
 def initial_rockfall(cfg, state):

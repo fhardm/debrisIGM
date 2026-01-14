@@ -5,7 +5,7 @@
 
 import tensorflow as tf
 
-from igm.utils.math.getmag import getmag
+from math_utils.getmag import getmag
 from utils import count_particles
 
 def deb_thickness(cfg, state):
