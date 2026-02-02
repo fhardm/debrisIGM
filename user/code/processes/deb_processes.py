@@ -125,10 +125,22 @@ def initial_rockfall_simple(cfg, state):
     return state
 
 def lateral_diffusion(cfg, state):
-    mask = state.particle["r"] == 1
+    mask = tf.logical_and(state.particle["r"] == 1, state.particle["thk"] > 0)  # Only consider on-glacier particles at the surface
     filtered_particle_x = tf.boolean_mask(state.particle["x"], mask)
     filtered_particle_y = tf.boolean_mask(state.particle["y"], mask)
+    
+    # Resample state.usurf to double the resolution
+    high_res_usurf = tf.image.resize(
+        tf.expand_dims(tf.expand_dims(state.usurf, axis=0), axis=-1),
+        size=(tf.shape(state.usurf)[0] * 2, tf.shape(state.usurf)[1] * 2),
+        method="bilinear",
+    )[0, :, :, 0]
 
+    dzdx, dzdy = compute_gradient_tf(high_res_usurf, state.dx/2, state.dx/2)
+    
+    high_res_slope = tf.atan(tf.sqrt(dzdx**2 + dzdy**2))
+    high_res_aspect = -tf.atan2(dzdx, -dzdy)
+    
     # Interpolate slope and aspect at the filtered positions
     i = filtered_particle_x / state.dx
     j = filtered_particle_y / state.dx
@@ -138,9 +150,10 @@ def lateral_diffusion(cfg, state):
         ),
         axis=0,
     )
+    
     if cfg.processes.debris_cover.tracking.library == "cuda":
         filtered_slope = interpolate_2d_cuda(state.slope_rad, indices)
-        filtered_aspect = interpolate_2d_cuda(state.aspect_rad, indices)
+        filtered_aspect = interpolate_2d_cuda(high_res_aspect, indices)
     else:
         filtered_slope = interpolate_bilinear_tf(
             tf.expand_dims(tf.expand_dims(state.slope_rad, axis=0), axis=-1),
@@ -149,18 +162,22 @@ def lateral_diffusion(cfg, state):
         )[0, :, 0]
 
         filtered_aspect = interpolate_bilinear_tf(
-            tf.expand_dims(tf.expand_dims(state.aspect_rad, axis=0), axis=-1),
+            tf.expand_dims(tf.expand_dims(high_res_aspect, axis=0), axis=-1),
             indices,
             indexing="ij",
         )[0, :, 0]
-
+    
     # Move the filtered particles in the aspect direction, scaled by slope and a custom factor beta
     beta = cfg.processes.debris_cover.tracking.latdiff_beta  # Custom scaling factor
-    displacement_x = beta * tf.math.sin(filtered_aspect) * tf.math.tan(filtered_slope) * state.dt
-    displacement_y = beta * tf.math.cos(filtered_aspect) * tf.math.tan(filtered_slope) * state.dt
+    displacement_x = tf.clip_by_value(beta * tf.math.sin(filtered_aspect) * tf.math.tan(filtered_slope)**2 * state.dt, -beta, beta) # displacement in x direction (limited to beta at 45° and above)
+    displacement_y = tf.clip_by_value(beta * tf.math.cos(filtered_aspect) * tf.math.tan(filtered_slope)**2 * state.dt, -beta, beta) # displacement in y direction (limited to beta at 45° and above)
 
     filtered_particle_x += displacement_x
     filtered_particle_y += displacement_y
+
+    # Ensure the new positions remain within the domain
+    filtered_particle_x = tf.clip_by_value(filtered_particle_x, 0, state.x[-1] - state.x[0])
+    filtered_particle_y = tf.clip_by_value(filtered_particle_y, 0, state.y[-1] - state.y[0])
     
     # Update the particle positions in the state
     state.particle["x"] = tf.tensor_scatter_nd_update(state.particle["x"], tf.where(mask), filtered_particle_x)
