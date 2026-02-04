@@ -6,6 +6,7 @@
 import tensorflow as tf
 import numpy as np
 
+from math_utils.compute_gradient_tf import compute_gradient_tf
 from math_utils.interpolate_bilinear_tf import interpolate_bilinear_tf
 from utils import interpolate_2d_cuda
 
