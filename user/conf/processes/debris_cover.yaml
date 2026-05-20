@@ -6,6 +6,7 @@ seeding:
   density: []
   slope_threshold: 45
   thk_threshold: 20
+  smb_threshold: -9999
   initial_rockfall: default
   max_runout: 0.5 # relative to initial rockfall distance (0.5 = total of 1.5x initial distance)
   slope_correction: true

@@ -96,16 +96,17 @@ def run(cfg, state):
                 nc.pyproj_srs = state.pyproj_srs
 
             if hasattr(cfg.processes,'iceflow'):
-                if "Nz" in cfg.processes.debris_cover.tracking:
-                    nc.createDimension("z", cfg.processes.debris_cover.tracking.Nz)
-                    E = nc.createVariable("z", np.dtype("float32").char, ("z",))
-                    E.units = "m"
-                    E.long_name = "z"
-                    E.axis = "Z"
-                    E[:] = np.arange(
-                        cfg.processes.debris_cover.tracking.Nz
-                    )  # TODO: fix this, that's not what we want
-                    print("E:", E)
+                if hasattr(cfg.processes, 'debris_cover'):
+                    if "Nz" in cfg.processes.debris_cover.tracking:
+                        nc.createDimension("z", cfg.processes.debris_cover.tracking.Nz)
+                        E = nc.createVariable("z", np.dtype("float32").char, ("z",))
+                        E.units = "m"
+                        E.long_name = "z"
+                        E.axis = "Z"
+                        E[:] = np.arange(
+                            cfg.processes.debris_cover.tracking.Nz
+                        )  # TODO: fix this, that's not what we want
+                        print("E:", E)
 
             for var in cfg.outputs.write_ncdf.vars_to_save:
                 if hasattr(state, var):

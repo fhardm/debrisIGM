@@ -7,6 +7,7 @@ import tensorflow as tf
 
 from math_utils.getmag import getmag
 from utils import count_particles
+from utils import debris_flux
 
 def deb_thickness(cfg, state):
     if (state.t.numpy() - state.tlast_mb) == 0:
@@ -16,12 +17,7 @@ def deb_thickness(cfg, state):
         state.debcon.assign(tf.reduce_sum(state.engl_w_sum[:-1, :, :], axis=0) / (state.dx**2 * state.thk)) # convert to m depth-averaged volumetric debris concentration by dividing representative volume (m3 debris per particle) by dx^2 (m2 grid cell area) and ice thickness thk
         if "debcon_vert" in cfg.outputs.write_ncdf.vars_to_save:
             state.debcon_vert.assign(tf.where(state.thk[None,:,:] > 0, state.engl_w_sum[:-1, :, :] / (state.dx**2 * state.thk[None,:,:]) * cfg.processes.debris_cover.tracking.Nz, 0.0)) # vertically resolved debris concentration
-        state.debflux_supragl = state.debthick * getmag(state.uvelsurf,state.vvelsurf) # debris flux (supraglacial)
-        if cfg.processes.debris_cover.tracking.Nz != cfg.processes.iceflow.numerics.Nz:
-            engl_w_sum_Nz = tf.reduce_sum(tf.reshape(state.engl_w_sum[:-1, :, :], (-1, int(cfg.processes.debris_cover.tracking.Nz / cfg.processes.iceflow.numerics.Nz), *state.engl_w_sum.shape[1:])), axis=1)
-            state.debflux_engl = tf.reduce_sum(engl_w_sum_Nz * tf.sqrt(state.U**2 + state.V**2), axis=0) / state.dx**2 # debris flux (englacial)
-        else:
-            state.debflux_engl = tf.reduce_sum(state.engl_w_sum[:-1, : ,:] * tf.sqrt(state.U**2 + state.V**2), axis=0) / state.dx**2 # debris flux (englacial)
+        state.debflux_supragl, state.debflux_engl = debris_flux(state) # debris flux (supraglacial and englacial)
         state.debflux.assign(state.debflux_supragl + state.debflux_engl) # debris flux (englacial and supraglacial)
         state.thk_deb.assign(state.thk) # ice thickness at the beginning of the time step
         mask = (state.smb > 0) | (state.thk == 0) # mask out off-glacier areas and accumulation area

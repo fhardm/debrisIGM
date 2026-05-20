@@ -167,7 +167,8 @@ def aggregate_immobile_particles(state):
     count = tf.tensor_scatter_nd_add(zeros, grid_indices, tf.ones_like(immobile_data["t"], dtype=tf.float32))
 
     # Compute means
-    t_mean = tf.math.divide_no_nan(t_sum, count)
+    # t_mean = tf.math.divide_no_nan(t_sum, count)
+    t_mean = tf.zeros_like(state.usurf, dtype=tf.float32)
     englt_mean = tf.math.divide_no_nan(englt_sum, count)
     # srcid_mean = tf.cast(tf.math.divide_no_nan(srcid_sum, tf.cast(count, tf.int32)), tf.int32)
     srcid_mean = tf.zeros_like(state.usurf, dtype=tf.int32)
@@ -271,6 +272,30 @@ def count_particles(cfg, state):
         engl_w_sum = tf.tensor_scatter_nd_add(engl_w_sum, indices_3d, filtered_w)
 
     return engl_w_sum
+
+def debris_flux(state):
+    # compute the flux per particle as the product of particle velocity and particle debris volume
+    state.particle["debflux"] = state.particle["vel"] * state.particle["w"]
+    # aggregate the debris flux of particles in each grid cell
+    grid_particle_x = tf.cast(tf.floor(state.particle["x"] / state.dx), tf.int32)
+    grid_particle_y = tf.cast(tf.floor(state.particle["y"] / state.dx), tf.int32)
+
+    indices = tf.stack([grid_particle_y, grid_particle_x], axis=1)
+    mask_surface = state.particle["r"] >= 0.99
+    mask_engl = state.particle["r"] < 0.99
+
+    debflux_supragl = tf.zeros_like(state.usurf, dtype=tf.float32)
+    debflux_engl = tf.zeros_like(state.usurf, dtype=tf.float32)
+
+    surf_indices = tf.boolean_mask(indices, mask_surface)
+    surf_flux = tf.boolean_mask(state.particle["debflux"], mask_surface)
+    debflux_supragl = tf.tensor_scatter_nd_add(debflux_supragl, surf_indices, surf_flux) / (state.dx**2)
+
+    engl_indices = tf.boolean_mask(indices, mask_engl)
+    engl_flux = tf.boolean_mask(state.particle["debflux"], mask_engl)
+    debflux_engl = tf.tensor_scatter_nd_add(debflux_engl, engl_indices, engl_flux) / (state.dx**2)
+
+    return debflux_supragl, debflux_engl
 
 def print_info_discrete(state):
     if state.t % 50 == 0:

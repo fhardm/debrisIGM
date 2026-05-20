@@ -30,6 +30,11 @@ def initialize_seeding(cfg, state):
     state.thk_deb = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.seeded_particles = tf.Variable([0], dtype=tf.float32)
     state.seeded_debris_volume = tf.Variable([0], dtype=tf.float32)
+    state.vol = tf.Variable([0], dtype=tf.float32)
+    state.surfdebvol = tf.Variable([0], dtype=tf.float32)
+    state.engldebvol = tf.Variable([0], dtype=tf.float32)
+    state.offgldebvol = tf.Variable([0], dtype=tf.float32)
+    
     state.tlast_seeding = -1.0e5000
     state.tcomp_particles = []
     state.particle_counter = tf.Variable([0], dtype=tf.float64)
@@ -181,8 +186,10 @@ def seeding_particles(cfg, state):
         slope_mask = state.slope_rad > (cfg.processes.debris_cover.seeding.slope_threshold / 180 * np.pi)
         # Apply ice thickness threshold
         thk_mask = state.thk < cfg.processes.debris_cover.seeding.thk_threshold
+        # Apply SMB threshold
+        smb_mask = state.smb > cfg.processes.debris_cover.seeding.smb_threshold
         # Combine all masks
-        state.gridseed = tf.logical_and(slope_mask, thk_mask)
+        state.gridseed = tf.logical_and(slope_mask, tf.logical_and(thk_mask, smb_mask))
         if hasattr(state, 'icemask'):
             state.gridseed = tf.logical_and(state.gridseed, state.icemask > 0)
         # For "both" type, combine with shapefile mask
@@ -316,6 +323,12 @@ def seeding_particles(cfg, state):
         state.seeded_particles = tf.size(state.nparticle["x"])
         # Calculate the sum of seeded debris volume
         state.seeded_debris_volume = tf.reduce_sum(state.nparticle["w"])
+        
+        # Calculate total ice volume (vol), surface debris volume (surfdebvol), englacial debris volume (engldebvol) and off-glacier debris volume (offgldebvol) for the current timestep
+        state.vol = tf.reduce_sum(state.thk) * state.dx**2
+        state.surfdebvol = tf.reduce_sum(state.debthick) * state.dx**2
+        state.engldebvol = tf.reduce_sum(state.debcon * state.thk) * state.dx**2
+        state.offgldebvol = tf.reduce_sum(state.debthick_offglacier) * state.dx**2
 
         if cfg.processes.debris_cover.seeding.initial_rockfall == "default":
             from deb_processes import initial_rockfall

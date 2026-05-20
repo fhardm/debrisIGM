@@ -90,7 +90,7 @@ def run(cfg, state):
                     c = state.particle["srcid"][::r].numpy() / np.max(state.particle["srcid"].numpy()), # normalized to 1
                     vmin=0,
                     vmax=1,
-                    s=0.5,
+                    s=0.1,
                     cmap="RdBu",
                 )
             else:
@@ -103,7 +103,7 @@ def run(cfg, state):
                     c = state.particle[cfg.outputs.plot_debris.part_var][::r].numpy(),
                     vmin=cfg.outputs.plot_debris.part_var_min,
                     vmax=cfg.outputs.plot_debris.part_var_max,
-                    s=0.5,
+                    s=0.1,
                     cmap="RdBu",
                 )
                     

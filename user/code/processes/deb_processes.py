@@ -68,10 +68,30 @@ def initial_rockfall(cfg, state):
         state.nparticle["x"] += diff_x * runout_factor
         state.nparticle["y"] += diff_y * runout_factor
 
-        # Ensure particles remain within the domain
-        state.nparticle["x"] = tf.clip_by_value(state.nparticle["x"], 0, state.x[-1] - state.x[0])
-        state.nparticle["y"] = tf.clip_by_value(state.nparticle["y"], 0, state.y[-1] - state.y[0])
-
+    # Ensure particles remain within the domain
+    state.nparticle["x"] = tf.clip_by_value(state.nparticle["x"], 0, state.x[-1] - state.x[0])
+    state.nparticle["y"] = tf.clip_by_value(state.nparticle["y"], 0, state.y[-1] - state.y[0])
+    
+    # Calculate indices for z interpolation
+    i = state.nparticle["x"] / state.dx
+    j = state.nparticle["y"] / state.dx
+    indices = tf.expand_dims(
+        tf.concat(
+            [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
+        ),
+        axis=0,
+    )
+    state.nparticle["z"] = interpolate_bilinear_tf(
+                tf.expand_dims(tf.expand_dims(state.usurf, axis=0), axis=-1),
+                indices,
+                indexing="ij",
+            )[0, :, 0]
+    state.nparticle["thk"] = interpolate_bilinear_tf(
+                tf.expand_dims(tf.expand_dims(state.thk, axis=0), axis=-1),
+                indices,
+                indexing="ij",
+            )[0, :, 0]
+    
     return state
 
 
@@ -122,7 +142,27 @@ def initial_rockfall_simple(cfg, state):
     # Ensure particles remain within the domain
     state.nparticle["x"] = tf.clip_by_value(state.nparticle["x"], 0, state.x[-1] - state.x[0])
     state.nparticle["y"] = tf.clip_by_value(state.nparticle["y"], 0, state.y[-1] - state.y[0])
-
+    
+    # Calculate indices for z interpolation
+    i = state.nparticle["x"] / state.dx
+    j = state.nparticle["y"] / state.dx
+    indices = tf.expand_dims(
+        tf.concat(
+            [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
+        ),
+        axis=0,
+    )
+    state.nparticle["z"] = interpolate_bilinear_tf(
+                tf.expand_dims(tf.expand_dims(state.usurf, axis=0), axis=-1),
+                indices,
+                indexing="ij",
+            )[0, :, 0]
+    state.nparticle["thk"] = interpolate_bilinear_tf(
+            tf.expand_dims(tf.expand_dims(state.thk, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+    
     return state
 
 def lateral_diffusion(cfg, state):
