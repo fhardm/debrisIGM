@@ -11,7 +11,7 @@ from igm.processes.particles.utils import get_weights_lagrange, get_weights_lege
 from deb_seeding import seeding_particles
 from utils import aggregate_immobile_particles
 from utils import moraine_builder
-from deb_processes import lateral_diffusion
+from deb_processes import lateral_diffusion, lateral_diffusion_fixed
 
 
 def deb_particles(cfg, state):
@@ -24,15 +24,16 @@ def deb_particles(cfg, state):
        
     if hasattr(state, "logger"):
         state.logger.info("Update particle tracking at time : " + str(state.t.numpy()))
-
-    if (state.t.numpy() - state.tlast_seeding) >= cfg.processes.debris_cover.seeding.frequency:
+        
+    t_rounded = round(state.t.numpy() / cfg.processes.debris_cover.seeding.frequency) * cfg.processes.debris_cover.seeding.frequency
+    if (t_rounded - state.tlast_seeding) >= cfg.processes.debris_cover.seeding.frequency:
         seeding_particles(cfg, state)
 
         # merge the new seeding points with the former ones
         for key in state.particle_attributes:
             state.particle[key] = tf.concat([state.particle[key], state.nparticle[key]], axis=-1)
 
-        state.tlast_seeding = state.t.numpy()
+        state.tlast_seeding = t_rounded
 
     if (tf.shape(state.particle["x"])[0] > 0) & (state.it >= 0):
         state.tcomp_particles.append(time.time())
@@ -114,6 +115,10 @@ def deb_particles(cfg, state):
             state = moraine_builder(cfg, state)
             
         if cfg.processes.debris_cover.tracking.latdiff_beta > 0:
-            # update the lateral diffusion of surface debris particles
-            state = lateral_diffusion(cfg, state)
+            if cfg.processes.debris_cover.tracking.latdiff_mode == "fixed":
+                # update the lateral diffusion of surface debris particles
+                state = lateral_diffusion_fixed(cfg, state)
+            else:
+                # update the lateral diffusion of surface debris particles
+                state = lateral_diffusion(cfg, state)
     return state

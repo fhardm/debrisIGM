@@ -166,7 +166,8 @@ def initial_rockfall_simple(cfg, state):
     return state
 
 def lateral_diffusion(cfg, state):
-    mask = tf.logical_and(state.particle["r"] == 1, state.particle["thk"] > 0)  # Only consider on-glacier particles at the surface
+    particle_age_mask = tf.logical_and(state.particle["t"] != 0, (state.t - state.particle["t"]) > 50)  # Calculate particle age, filter out recently (<50yrs) seeded particles
+    mask = tf.logical_and(tf.logical_and(state.particle["r"] >= 0.99, state.particle["thk"] > 0), particle_age_mask)  # Only consider on-glacier particles at the surface (that have not been seeded in the current time step)
     filtered_particle_x = tf.boolean_mask(state.particle["x"], mask)
     filtered_particle_y = tf.boolean_mask(state.particle["y"], mask)
     
@@ -223,4 +224,78 @@ def lateral_diffusion(cfg, state):
     # Update the particle positions in the state
     state.particle["x"] = tf.tensor_scatter_nd_update(state.particle["x"], tf.where(mask), filtered_particle_x)
     state.particle["y"] = tf.tensor_scatter_nd_update(state.particle["y"], tf.where(mask), filtered_particle_y)
+    return state
+
+
+def lateral_diffusion_fixed(cfg, state):
+    particle_age_mask = tf.logical_and(state.particle["t"] != 0, (state.t - state.particle["t"]) > 50)  # Calculate particle age, filter out recently (<50yrs) seeded particles
+    mask = tf.logical_and(tf.logical_and(state.particle["r"] >= 0.99, state.particle["thk"] > 0), particle_age_mask)  # Only consider on-glacier particles at the surface (that have not been seeded in the current time step)
+    filtered_particle_x = tf.boolean_mask(state.particle["x"], mask)
+    filtered_particle_y = tf.boolean_mask(state.particle["y"], mask)
+    
+    x_size = tf.cast(tf.math.round(tf.cast(tf.shape(state.usurf)[0], tf.float32) * state.dx / 100), tf.int32)
+    y_size = tf.cast(tf.math.round(tf.cast(tf.shape(state.usurf)[1], tf.float32) * state.dx / 100), tf.int32)    
+    # Resample state.usurf to fixed resolution of 100m
+    usurf_100m = tf.image.resize(
+        tf.expand_dims(tf.expand_dims(state.usurf, axis=0), axis=-1),
+        size=(x_size, y_size),
+        method="bilinear",
+    )[0, :, :, 0]
+
+    dzdx, dzdy = compute_gradient_tf(usurf_100m, 100, 100)
+    
+    slope_100m = tf.atan(tf.sqrt(dzdx**2 + dzdy**2))
+    aspect_100m = -tf.atan2(dzdx, -dzdy)
+    
+    # Interpolate slope and aspect at the filtered positions
+    i = filtered_particle_x / 100
+    j = filtered_particle_y / 100
+    indices = tf.expand_dims(
+        tf.concat(
+            [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
+        ),
+        axis=0,
+    )
+    
+    if cfg.processes.debris_cover.tracking.library == "cuda":
+        filtered_slope = interpolate_2d_cuda(slope_100m, indices)
+        filtered_aspect = interpolate_2d_cuda(aspect_100m, indices)
+    else:
+        filtered_slope = interpolate_bilinear_tf(
+            tf.expand_dims(tf.expand_dims(slope_100m, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+
+        filtered_aspect = interpolate_bilinear_tf(
+            tf.expand_dims(tf.expand_dims(aspect_100m, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+    
+    # Move the filtered particles in the aspect direction, scaled by slope and a custom factor beta
+    beta = cfg.processes.debris_cover.tracking.latdiff_beta  # Custom scaling factor
+    displacement_x = tf.clip_by_value(beta * tf.math.sin(filtered_aspect) * tf.math.tan(filtered_slope)**2 * state.dt, -beta, beta) # displacement in x direction (limited to beta at 45° and above)
+    displacement_y = tf.clip_by_value(beta * tf.math.cos(filtered_aspect) * tf.math.tan(filtered_slope)**2 * state.dt, -beta, beta) # displacement in y direction (limited to beta at 45° and above)
+
+    filtered_particle_x += displacement_x
+    filtered_particle_y += displacement_y
+
+    # Ensure the new positions remain within the domain
+    filtered_particle_x = tf.clip_by_value(filtered_particle_x, 0, state.x[-1] - state.x[0])
+    filtered_particle_y = tf.clip_by_value(filtered_particle_y, 0, state.y[-1] - state.y[0])
+    
+    # Update the particle positions in the state
+    state.particle["x"] = tf.tensor_scatter_nd_update(state.particle["x"], tf.where(mask), filtered_particle_x)
+    state.particle["y"] = tf.tensor_scatter_nd_update(state.particle["y"], tf.where(mask), filtered_particle_y)
+    
+    # Update displacement velocities for output
+    # Assign computed values for particles inside mask and zeros for all particles outside the mask
+    zeros_x = tf.zeros_like(state.particle["latdiff_x"])
+    zeros_y = tf.zeros_like(state.particle["latdiff_y"])
+    filled_latdiff_x = tf.tensor_scatter_nd_update(zeros_x, tf.where(mask), displacement_x / state.dt)
+    filled_latdiff_y = tf.tensor_scatter_nd_update(zeros_y, tf.where(mask), displacement_y / state.dt)
+    state.particle["latdiff_x"] = filled_latdiff_x
+    state.particle["latdiff_y"] = filled_latdiff_y
+    
     return state

@@ -20,7 +20,7 @@ def initialize(cfg, state):
     state.particle = {}  # this is a dictionary to store the particles
     state.nparticle = {}  # this is a dictionary to store the new particles
     state.particle_attributes = ["ID", "x", "y", "z", "r", "w",
-                 "t", "englt", "thk", "topg", "srcid", "vel"]
+                 "t", "englt", "thk", "topg", "srcid", "vel", "latdiff_x", "latdiff_y"]  # list of particle attributes, to be initialized as empty tensors
     for key in state.particle_attributes:
         if key == "srcid":
             state.particle[key] = tf.Variable([], dtype=tf.int32)

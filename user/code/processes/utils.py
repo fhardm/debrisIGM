@@ -134,7 +134,7 @@ def compute_mask_and_srcid(state, gdf):
 
 
 def aggregate_immobile_particles(state):
-    J = tf.logical_and(tf.greater(state.particle["thk"], 1.0), tf.greater(state.particle["vel"], 0.5)) # mobile particles (J) defined as having ice thickness > 1m and a velocity > 0.5 m/a
+    J = tf.logical_and(tf.greater(state.particle["thk"], 0.1), tf.greater(state.particle["vel"], 0.1)) # mobile particles (J) defined as having ice thickness > 0.1m and a velocity > 0.1 m/a
     # J = tf.greater(state.particle["thk"], 1.0)
     immobile_particles = tf.logical_not(J)
 
@@ -147,6 +147,8 @@ def aggregate_immobile_particles(state):
         "englt": tf.boolean_mask(state.particle["englt"], immobile_particles),
         "srcid": tf.boolean_mask(state.particle["srcid"], immobile_particles),
         "vel": tf.boolean_mask(state.particle["vel"], immobile_particles),
+        "latdiff_x": tf.boolean_mask(state.particle["latdiff_x"], immobile_particles),
+        "latdiff_y": tf.boolean_mask(state.particle["latdiff_y"], immobile_particles)
     }
 
     # Compute grid indices
@@ -167,8 +169,8 @@ def aggregate_immobile_particles(state):
     count = tf.tensor_scatter_nd_add(zeros, grid_indices, tf.ones_like(immobile_data["t"], dtype=tf.float32))
 
     # Compute means
-    # t_mean = tf.math.divide_no_nan(t_sum, count)
-    t_mean = tf.zeros_like(state.usurf, dtype=tf.float32)
+    t_mean = tf.math.divide_no_nan(t_sum, count)
+    # t_mean = tf.zeros_like(state.usurf, dtype=tf.float32)
     englt_mean = tf.math.divide_no_nan(englt_sum, count)
     # srcid_mean = tf.cast(tf.math.divide_no_nan(srcid_sum, tf.cast(count, tf.int32)), tf.int32)
     srcid_mean = tf.zeros_like(state.usurf, dtype=tf.int32)
@@ -208,6 +210,8 @@ def aggregate_immobile_particles(state):
         state.nparticle["topg"] = tf.gather_nd(state.topg, idx_flat)
         state.nparticle["srcid"] = tf.gather_nd(srcid_mean, idx_flat)
         state.nparticle["vel"] = tf.gather_nd(vel_mean, idx_flat)
+        state.nparticle["latdiff_x"] = tf.zeros_like(state.nparticle["x"])
+        state.nparticle["latdiff_y"] = tf.zeros_like(state.nparticle["y"])
 
         # Merge new particles with existing ones
         for attr in state.particle_attributes:

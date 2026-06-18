@@ -40,4 +40,13 @@ def deb_smb(cfg, state):
                 mask_eff = tf.logical_and(state.debthick > cfg.processes.debris_cover.smb.h_eff, state.debthick > 0)
                 state.smb = tf.where(mask_eff, state.smb * (cfg.processes.debris_cover.smb.k_debris + cfg.processes.debris_cover.smb.h_crit)/(state.debthick + cfg.processes.debris_cover.smb.k_debris), state.smb)
                 state.smb = tf.where(~mask_eff, state.smb * ((cfg.processes.debris_cover.smb.k_debris + cfg.processes.debris_cover.smb.h_crit)/(cfg.processes.debris_cover.smb.h_eff + cfg.processes.debris_cover.smb.k_debris) * state.debthick/cfg.processes.debris_cover.smb.h_eff + (cfg.processes.debris_cover.smb.h_eff - state.debthick)/cfg.processes.debris_cover.smb.h_eff), state.smb)
+            elif cfg.processes.debris_cover.smb.type == "smooth_Anderson2016": # smoothed to 50m resolution
+                # smooth debthick to an effective resolution of ~50 m independent of grid spacing state.dx
+                dx = float(state.dx.numpy()) if hasattr(state.dx, "numpy") else float(state.dx)
+                kernel_size = max(1, int(round(50.0 / dx)))
+                # use a square averaging filter of size kernel_size x kernel_size
+                kernel = tf.ones((kernel_size, kernel_size, 1, 1), dtype=state.debthick.dtype) / (kernel_size * kernel_size)
+                debthick_smooth = tf.nn.conv2d(state.debthick[None, :, :, None], kernel, strides=(1, 1, 1, 1), padding="SAME")[0, :, :, 0]
+                mask = debthick_smooth > 0
+                state.smb = tf.where(mask, state.smb * cfg.processes.debris_cover.smb.oestrem_D0 / (cfg.processes.debris_cover.smb.oestrem_D0 + debthick_smooth), state.smb)
     return state

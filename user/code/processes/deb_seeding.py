@@ -28,6 +28,7 @@ def initialize_seeding(cfg, state):
     state.debflux_supragl = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.debflux_engl = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.thk_deb = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+    state.seeding_instances = tf.Variable([0], dtype=tf.float32)
     state.seeded_particles = tf.Variable([0], dtype=tf.float32)
     state.seeded_debris_volume = tf.Variable([0], dtype=tf.float32)
     state.vol = tf.Variable([0], dtype=tf.float32)
@@ -314,15 +315,18 @@ def seeding_particles(cfg, state):
             "topg": topg_I,
             "srcid": srcid_I,
             "vel": tf.zeros_like(X_I),  # initial velocity set to zero
+            "latdiff_x": tf.zeros_like(X_I),  # initial lateral displacement velocity set to zero
+            "latdiff_y": tf.zeros_like(X_I)
         }
 
         for attr in state.particle_attributes:
             state.nparticle[attr] = attributes_values[attr]
 
-        # Calculate the amount of seeded particles
-        state.seeded_particles = tf.size(state.nparticle["x"])
-        # Calculate the sum of seeded debris volume
-        state.seeded_debris_volume = tf.reduce_sum(state.nparticle["w"])
+        # Calculate the amount of seeded particles (per year)
+        state.seeding_instances = state.seeding_instances + 1
+        state.seeded_particles = tf.cast(tf.size(state.nparticle["x"]), tf.float32) / cfg.processes.debris_cover.seeding.frequency
+        # Calculate the sum of seeded debris volume (per year)
+        state.seeded_debris_volume = tf.reduce_sum(state.nparticle["w"]) / cfg.processes.debris_cover.seeding.frequency
         
         # Calculate total ice volume (vol), surface debris volume (surfdebvol), englacial debris volume (engldebvol) and off-glacier debris volume (offgldebvol) for the current timestep
         state.vol = tf.reduce_sum(state.thk) * state.dx**2
