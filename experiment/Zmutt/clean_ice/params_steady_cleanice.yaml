@@ -1,0 +1,69 @@
+# @package _global_
+
+defaults:
+  
+  - /user/conf/processes@processes.smb_aspect: smb_aspect
+
+  - override /inputs:
+     - load_ncdf
+  - override /processes:
+     - iceflow
+     - time
+     - vert_flow
+     - smb_aspect
+     - avalanche
+     - thk
+  - override /outputs: 
+     - write_ncdf
+
+
+# hydra:
+#   # output_subdir: my_result_${core.gpu_id} # name the result based on the GPU ID
+#   # output_subdir: my_result_particles_${processes.particles.frequency_seeding} # name the result based on a parameter with multirun
+#   job:
+#     chdir: True
+
+core:
+  print_comp: true
+  print_info: false
+
+inputs:
+  load_ncdf:
+    input_file: input_Zmutt_50m_new.nc
+    icemask_include: true
+    icemask_shapefile: /home/florian/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
+    icemask_invert: true
+    crop: true
+    xmin: 389000
+    xmax: 400400
+    ymin: 5090000
+    ymax: 5100100
+
+processes:
+  smb_aspect:
+    array:
+      - ["time", "gradabl", "gradacc", "ela", "accmax"]
+      - [ 0,         0.009,     0.005,  3050,      2.0]
+      - [ 3000,      0.009,     0.005,  3050,      2.0]
+  time:
+    start: 1000.0
+    end: 3000.0
+    save: 10.0
+  avalanche:
+    update_freq: 1
+    angleOfRepose: 45.0
+
+outputs:
+  write_ncdf:
+    output_file: output.nc
+    vars_to_save:
+      - topg
+      - usurf
+      - thk
+      - smb
+      - velbar_mag
+      - velsurf_mag
+      - wvelsurf
+      - seeding_instances
+
+  

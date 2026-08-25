@@ -34,10 +34,10 @@ core:
   print_imported_modules: false
   hardware:
     gpu_info: false
-
+    
 inputs:
   load_ncdf:
-    input_file: input_Zmutt_25m.nc
+    input_file: input_Zmutt_50m_new.nc
     icemask_include: true
     icemask_shapefile: /home/florian/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
     icemask_invert: true
@@ -51,25 +51,19 @@ processes:
   smb_aspect:
     array:
       - ["time", "gradabl", "gradacc", "ela", "accmax"]
-      - [ 0,         0.009,     0.005,  3025,      2.0]
-      - [ 1849,      0.009,     0.005,  3025,      2.0]
-      - [ 1850,      0.009,     0.005,  3025,      2.0]
-      - [ 2000,      0.009,     0.005,  3025,      2.0]
-      - [ 2149,      0.009,     0.005,  3025,      2.0]
-      - [ 2150,      0.009,     0.005,  3025,      2.0]
-      - [ 2600,      0.009,     0.005,  3025,      2.0]
-      - [ 3000,      0.009,     0.005,  3025,      2.0]
+      - [ 0,         0.009,     0.005,  3050,      2.0]
+      - [ 3000,      0.009,     0.005,  3050,      2.0]
   time:
     start: 1000.0
-    end: 2000.0
+    end: 3000.0
     save: 10.0
   avalanche:
-    update_freq: 5
+    update_freq: 1
     angleOfRepose: 45.0
   debris_cover:
     seeding:
       type: conditions
-      delay: 50
+      delay: 100
       frequency: 1
       density:
       - ["time", "d_in"]
@@ -81,16 +75,17 @@ processes:
       max_runout: 0.0
       slope_correction: true
     tracking:
-      library: cuda
+      library: cuda # if you use CPU, change to "tensorflow"
       method: 3d
       aggregate_immobile_particles: true
-      moraine_builder: true
-      latdiff_beta: 0.0
-      print_info: live
+      moraine_builder: false
+      latdiff_beta: 50
+      print_info: discrete
+      latdiff_mode: unfixed
     smb:
-      debris_porosity: 0.3
+      debris_porosity: 0.33
       type: Anderson2016
-      oestrem_D0: 0.065
+      oestrem_D0: 0.061
 
 outputs:
   write_ncdf:
@@ -103,14 +98,18 @@ outputs:
       - debthick
       - debthick_offglacier
       - debcon
-      - debcon_vert
       - debflux
-      - velbar_mag
       - velsurf_mag
       - wvelsurf
+      - slope_rad
+      - gridseed
+      - seeding_instances
       - seeded_particles
       - seeded_debris_volume
-      - gridseed
+      - vol
+      - surfdebvol
+      - engldebvol
+      - offgldebvol
   write_debris:
     vars_to_save:
       - ID

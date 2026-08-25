@@ -1,0 +1,132 @@
+# @package _global_
+
+defaults:
+  
+  - /user/conf/processes@processes.debris_cover: debris_cover
+  - /user/conf/processes@processes.smb_aspect: smb_aspect
+  - /user/conf/outputs@outputs.plot_debris: plot_debris
+  - /user/conf/outputs@outputs.write_debris: write_debris
+
+  - override /inputs:
+     - load_ncdf
+  - override /processes:
+     - iceflow
+     - time
+     - vert_flow
+     - smb_aspect
+     - avalanche
+     - debris_cover
+     - thk
+  - override /outputs: 
+     - write_ncdf
+     - plot_debris
+     - write_debris
+
+# hydra:
+#   # output_subdir: my_result_${core.gpu_id} # name the result based on the GPU ID
+#   # output_subdir: my_result_particles_${processes.particles.frequency_seeding} # name the result based on a parameter with multirun
+#   job:
+#     chdir: True
+
+core:
+  print_comp: true
+  print_info: false
+  print_imported_modules: false
+  hardware:
+    gpu_info: false
+    
+inputs:
+  load_ncdf:
+    input_file: input_Zmutt_50m_new.nc
+    icemask_include: true
+    icemask_shapefile: /home/florian/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
+    icemask_invert: true
+    crop: true
+    xmin: 389000
+    xmax: 400400
+    ymin: 5090000
+    ymax: 5100100
+
+processes:
+  smb_aspect:
+    array:
+      - ["time", "gradabl", "gradacc", "ela", "accmax"]
+      - [ 0,         0.009,     0.005,  3000,      2.0]
+      - [ 3000,      0.009,     0.005,  3000,      2.0]
+  time:
+    start: 1000.0
+    end: 3000.0
+    save: 10.0
+  avalanche:
+    update_freq: 1
+    angleOfRepose: 45.0
+  debris_cover:
+    seeding:
+      type: conditions
+      delay: 100
+      frequency: 100
+      density:
+      - ["time", "d_in"]
+      - [ 0,        0.3]
+      - [ 3000,     0.3]
+      slope_threshold: 45
+      thk_threshold: 20
+      initial_rockfall: simple
+      max_runout: 0.0
+      slope_correction: true
+    tracking:
+      library: cuda # if you use CPU, change to "tensorflow"
+      method: 3d
+      aggregate_immobile_particles: true
+      moraine_builder: false
+      latdiff_beta: 50
+      latdiff_mode: unfixed
+      print_info: discrete
+    smb:
+      debris_porosity: 0.33
+      type: Anderson2016
+      oestrem_D0: 0.061
+
+outputs:
+  write_ncdf:
+    output_file: output.nc
+    vars_to_save:
+      - topg
+      - usurf
+      - thk
+      - smb
+      - debthick
+      - debthick_offglacier
+      - debcon
+      - debflux
+      - velsurf_mag
+      - wvelsurf
+      - slope_rad
+      - gridseed
+      - seeded_particles
+      - seeded_debris_volume
+      - vol
+      - surfdebvol
+      - engldebvol
+      - offgldebvol
+      - seeding_instances
+  write_debris:
+    vars_to_save:
+      - ID
+      - x
+      - y
+      - z
+      - r
+      - t
+      - englt
+      - topg
+      - thk
+      - w
+    save: 50.0
+  plot_debris:
+    save: 50.0
+    live: false
+    var_max: 150
+    part_var: r
+    part_var_min: 0
+    part_var_max: 1
