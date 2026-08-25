@@ -7,6 +7,8 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 import rasterio
+from netCDF4 import Dataset
+import os
 
 from math_utils.compute_gradient_tf import compute_gradient_tf
 from math_utils.interp1d_tf import interp1d_tf
@@ -18,7 +20,7 @@ from utils import read_seeding_points_from_csv
 
 def initialize_seeding(cfg, state):
     # initialize the debris variables
-    state.engl_w_sum = tf.Variable(tf.zeros((cfg.processes.debris_cover.tracking.Nz + 1,) + tuple(state.usurf.shape), dtype=tf.float32))
+    state.engl_w_sum = tf.Variable(tf.zeros((cfg.processes.debris_cover.tracking.Nz + 2,) + tuple(state.usurf.shape), dtype=tf.float32))
     state.debthick = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.debthick_offglacier = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     state.debcon = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
@@ -151,7 +153,18 @@ def initialize_seeding(cfg, state):
         for year in df['seeding_year'].unique():
             state.seeding_points_by_year[int(year)] = df[df['seeding_year'] == year].copy()
 
-    if hasattr(state, 'gridseed') and hasattr(state, 'icemask'):
+    elif cfg.processes.debris_cover.seeding.type == "gridseed":
+        filepath = os.path.join(state.original_cwd,cfg.core.folder_data, \
+                            cfg.processes.debris_cover.seeding.gridseed)
+        nc = Dataset(filepath, "r")
+        gridseed = np.squeeze(nc.variables["gridseed"][:]).astype("float32")
+        state.gridseed = tf.constant(gridseed, dtype=tf.bool)
+        nc.close()
+    
+        print("gridseed shape:", state.gridseed.shape)
+        print("icemask shape:", state.icemask.shape)
+        
+    if hasattr(state, 'gridseed') and hasattr(state, 'icemask') and cfg.processes.debris_cover.seeding.type != "gridseed":
         state.gridseed = tf.logical_and(state.gridseed, state.icemask > 0)
 
     return state
@@ -180,7 +193,7 @@ def seeding_particles(cfg, state):
     if cfg.processes.debris_cover.seeding.slope_correction:
         state.volume_per_particle = state.volume_per_particle / tf.cos(state.slope_rad)
     else:
-        state.volume_per_particle = state.volume_per_particle * tf.ones_like(state.slope_rad)
+        state.volume_per_particle = state.volume_per_particle * tf.ones_like(state.slope_rad) / tf.cos(45.0 / 180 * np.pi)
 
     if cfg.processes.debris_cover.seeding.type == "conditions" or cfg.processes.debris_cover.seeding.type == "both":
         # Apply slope threshold
@@ -316,7 +329,8 @@ def seeding_particles(cfg, state):
             "srcid": srcid_I,
             "vel": tf.zeros_like(X_I),  # initial velocity set to zero
             "latdiff_x": tf.zeros_like(X_I),  # initial lateral displacement velocity set to zero
-            "latdiff_y": tf.zeros_like(X_I)
+            "latdiff_y": tf.zeros_like(X_I),
+            "partsum": tf.ones_like(X_I)
         }
 
         for attr in state.particle_attributes:
@@ -327,12 +341,6 @@ def seeding_particles(cfg, state):
         state.seeded_particles = tf.cast(tf.size(state.nparticle["x"]), tf.float32) / cfg.processes.debris_cover.seeding.frequency
         # Calculate the sum of seeded debris volume (per year)
         state.seeded_debris_volume = tf.reduce_sum(state.nparticle["w"]) / cfg.processes.debris_cover.seeding.frequency
-        
-        # Calculate total ice volume (vol), surface debris volume (surfdebvol), englacial debris volume (engldebvol) and off-glacier debris volume (offgldebvol) for the current timestep
-        state.vol = tf.reduce_sum(state.thk) * state.dx**2
-        state.surfdebvol = tf.reduce_sum(state.debthick) * state.dx**2
-        state.engldebvol = tf.reduce_sum(state.debcon * state.thk) * state.dx**2
-        state.offgldebvol = tf.reduce_sum(state.debthick_offglacier) * state.dx**2
 
         if cfg.processes.debris_cover.seeding.initial_rockfall == "default":
             from deb_processes import initial_rockfall

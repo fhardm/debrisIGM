@@ -195,7 +195,8 @@ def lateral_diffusion(cfg, state):
     
     if cfg.processes.debris_cover.tracking.library == "cuda":
         filtered_slope = interpolate_2d_cuda(state.slope_rad, indices)
-        filtered_aspect = interpolate_2d_cuda(high_res_aspect, indices)
+        # filtered_aspect = interpolate_2d_cuda(high_res_aspect, indices)
+        filtered_aspect = interpolate_2d_cuda(state.aspect_rad, indices)
     else:
         filtered_slope = interpolate_bilinear_tf(
             tf.expand_dims(tf.expand_dims(state.slope_rad, axis=0), axis=-1),
@@ -233,23 +234,25 @@ def lateral_diffusion_fixed(cfg, state):
     filtered_particle_x = tf.boolean_mask(state.particle["x"], mask)
     filtered_particle_y = tf.boolean_mask(state.particle["y"], mask)
     
-    x_size = tf.cast(tf.math.round(tf.cast(tf.shape(state.usurf)[0], tf.float32) * state.dx / 100), tf.int32)
-    y_size = tf.cast(tf.math.round(tf.cast(tf.shape(state.usurf)[1], tf.float32) * state.dx / 100), tf.int32)    
-    # Resample state.usurf to fixed resolution of 100m
-    usurf_100m = tf.image.resize(
+    fixed_res = 50  # Fixed resolution in meters
+    
+    x_size = tf.cast(tf.math.round(tf.cast(tf.shape(state.usurf)[0], tf.float32) * state.dx / fixed_res), tf.int32)
+    y_size = tf.cast(tf.math.round(tf.cast(tf.shape(state.usurf)[1], tf.float32) * state.dx / fixed_res), tf.int32)    
+    # Resample state.usurf to fixed resolution
+    usurf_fixed = tf.image.resize(
         tf.expand_dims(tf.expand_dims(state.usurf, axis=0), axis=-1),
         size=(x_size, y_size),
         method="bilinear",
     )[0, :, :, 0]
 
-    dzdx, dzdy = compute_gradient_tf(usurf_100m, 100, 100)
+    dzdx, dzdy = compute_gradient_tf(usurf_fixed, fixed_res, fixed_res)
     
-    slope_100m = tf.atan(tf.sqrt(dzdx**2 + dzdy**2))
-    aspect_100m = -tf.atan2(dzdx, -dzdy)
+    slope_fixed = tf.atan(tf.sqrt(dzdx**2 + dzdy**2))
+    aspect_fixed = -tf.atan2(dzdx, -dzdy)
     
     # Interpolate slope and aspect at the filtered positions
-    i = filtered_particle_x / 100
-    j = filtered_particle_y / 100
+    i = filtered_particle_x / fixed_res
+    j = filtered_particle_y / fixed_res
     indices = tf.expand_dims(
         tf.concat(
             [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
@@ -258,17 +261,17 @@ def lateral_diffusion_fixed(cfg, state):
     )
     
     if cfg.processes.debris_cover.tracking.library == "cuda":
-        filtered_slope = interpolate_2d_cuda(slope_100m, indices)
-        filtered_aspect = interpolate_2d_cuda(aspect_100m, indices)
+        filtered_slope = interpolate_2d_cuda(slope_fixed, indices)
+        filtered_aspect = interpolate_2d_cuda(aspect_fixed, indices)
     else:
         filtered_slope = interpolate_bilinear_tf(
-            tf.expand_dims(tf.expand_dims(slope_100m, axis=0), axis=-1),
+            tf.expand_dims(tf.expand_dims(slope_fixed, axis=0), axis=-1),
             indices,
             indexing="ij",
         )[0, :, 0]
 
         filtered_aspect = interpolate_bilinear_tf(
-            tf.expand_dims(tf.expand_dims(aspect_100m, axis=0), axis=-1),
+            tf.expand_dims(tf.expand_dims(aspect_fixed, axis=0), axis=-1),
             indices,
             indexing="ij",
         )[0, :, 0]

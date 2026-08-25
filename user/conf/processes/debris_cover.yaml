@@ -1,5 +1,6 @@
 seeding:
   type: conditions
+  gridseed: gridseed.nc
   area_file: debrismask.shp
   delay: 50
   frequency: 1
@@ -17,6 +18,7 @@ tracking:
   aggregate_immobile_particles: true
   moraine_builder: true
   latdiff_beta: 0
+  latdiff_mode: unfixed
   print_info: live
 smb:
   debris_porosity: 0.3

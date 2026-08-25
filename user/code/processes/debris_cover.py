@@ -20,7 +20,7 @@ def initialize(cfg, state):
     state.particle = {}  # this is a dictionary to store the particles
     state.nparticle = {}  # this is a dictionary to store the new particles
     state.particle_attributes = ["ID", "x", "y", "z", "r", "w",
-                 "t", "englt", "thk", "topg", "srcid", "vel", "latdiff_x", "latdiff_y"]  # list of particle attributes, to be initialized as empty tensors
+                 "t", "englt", "thk", "topg", "srcid", "vel", "latdiff_x", "latdiff_y", "partsum"]  # list of particle attributes, to be initialized as empty tensors
     for key in state.particle_attributes:
         if key == "srcid":
             state.particle[key] = tf.Variable([], dtype=tf.int32)
@@ -38,6 +38,15 @@ def update(cfg, state):
         # update the mass balance (SMB) depending by debris thickness, using clean-ice SMB from smb_simple.py
         state = deb_smb(cfg, state)
 
+        # Calculate total ice volume (vol), surface debris volume (surfdebvol), englacial debris volume (engldebvol) and off-glacier debris volume (offgldebvol) for the current timestep
+        state.vol = tf.reduce_sum(state.thk) * state.dx**2
+        mask_surf = tf.logical_and(state.particle["r"] >= 0.99, state.particle["thk"] > 0)
+        state.surfdebvol = tf.reduce_sum(tf.boolean_mask(state.particle["w"], mask_surf))
+        mask_engl = tf.logical_and(tf.logical_and(state.particle["r"] < 0.99, state.particle["r"] > 0), state.particle["thk"] > 0)
+        state.engldebvol = tf.reduce_sum(tf.boolean_mask(state.particle["w"], mask_engl))
+        mask_other = tf.logical_not(tf.logical_or(mask_surf, mask_engl))
+        state.offgldebvol = tf.reduce_sum(tf.boolean_mask(state.particle["w"], mask_other))
+        
         if cfg.processes.debris_cover.tracking.print_info == "live":
             print_info(state)
         elif cfg.processes.debris_cover.tracking.print_info == "discrete":

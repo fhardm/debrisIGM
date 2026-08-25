@@ -148,7 +148,8 @@ def aggregate_immobile_particles(state):
         "srcid": tf.boolean_mask(state.particle["srcid"], immobile_particles),
         "vel": tf.boolean_mask(state.particle["vel"], immobile_particles),
         "latdiff_x": tf.boolean_mask(state.particle["latdiff_x"], immobile_particles),
-        "latdiff_y": tf.boolean_mask(state.particle["latdiff_y"], immobile_particles)
+        "latdiff_y": tf.boolean_mask(state.particle["latdiff_y"], immobile_particles),
+        "partsum": tf.boolean_mask(state.particle["partsum"], immobile_particles)
     }
 
     # Compute grid indices
@@ -167,7 +168,8 @@ def aggregate_immobile_particles(state):
     # srcid_sum = tf.tensor_scatter_nd_add(zeros_int, grid_indices, immobile_data["srcid"])
     vel_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["vel"])
     count = tf.tensor_scatter_nd_add(zeros, grid_indices, tf.ones_like(immobile_data["t"], dtype=tf.float32))
-
+    part_sum = tf.tensor_scatter_nd_add(zeros, grid_indices, immobile_data["partsum"])
+    
     # Compute means
     t_mean = tf.math.divide_no_nan(t_sum, count)
     # t_mean = tf.zeros_like(state.usurf, dtype=tf.float32)
@@ -202,7 +204,7 @@ def aggregate_immobile_particles(state):
         state.nparticle["x"] = tf.gather_nd(avg_x, idx_flat)
         state.nparticle["y"] = tf.gather_nd(avg_y, idx_flat)
         state.nparticle["z"] = tf.gather_nd(state.usurf, idx_flat)
-        state.nparticle["r"] = tf.ones_like(state.nparticle["x"])
+        state.nparticle["r"] = tf.zeros_like(state.nparticle["x"])
         state.nparticle["w"] = tf.gather_nd(w_sum, idx_flat)
         state.nparticle["t"] = tf.gather_nd(t_mean, idx_flat)
         state.nparticle["englt"] = tf.gather_nd(englt_mean, idx_flat)
@@ -212,19 +214,24 @@ def aggregate_immobile_particles(state):
         state.nparticle["vel"] = tf.gather_nd(vel_mean, idx_flat)
         state.nparticle["latdiff_x"] = tf.zeros_like(state.nparticle["x"])
         state.nparticle["latdiff_y"] = tf.zeros_like(state.nparticle["y"])
+        state.nparticle["partsum"] = tf.gather_nd(part_sum, idx_flat)
 
         # Merge new particles with existing ones
         for attr in state.particle_attributes:
             state.particle[attr] = tf.concat([state.particle[attr], state.nparticle[attr]], axis=0)
 
+    # Ensure particles with partsum > 1 remain at r = 0
+    state.particle["r"] = tf.where(state.particle["partsum"] > 1, tf.zeros_like(state.particle["r"]), state.particle["r"])
+    
     return state
 
 def moraine_builder(cfg, state):
     # reset topography to initial state before re-evaluating the off-glacier debris thickness
-    state.topg = state.topg - state.debthick_offglacier
+    if cfg.processes.debris_cover.tracking.moraine_builder:
+        state.topg = state.topg - state.debthick_offglacier
 
-    # set state.particle["r"] of all particles where state.particle["thk"] == 0 to 1
-    state.particle["r"] = tf.where(state.particle["thk"] == 0, tf.ones_like(state.particle["r"]), state.particle["r"])
+    # set state.particle["r"] of all particles where state.particle["thk"] == 0 to 0
+    state.particle["r"] = tf.where(state.particle["thk"] == 0, tf.zeros_like(state.particle["r"]), state.particle["r"])
 
     # count particles in grid cells
     state.engl_w_sum = count_particles(cfg, state)
@@ -234,8 +241,9 @@ def moraine_builder(cfg, state):
     # apply off-glacier mask (where particle_thk < 0)
     mask = state.thk > 0
     state.debthick_offglacier.assign(tf.where(mask, 0.0, state.debthick_offglacier))
-    # add the resulting debris thickness to state.topg
-    state.topg = state.topg + state.debthick_offglacier
+    if cfg.processes.debris_cover.tracking.moraine_builder:
+        # add the resulting debris thickness to state.topg
+        state.topg = state.topg + state.debthick_offglacier
     return state
 
 # Count surface particles in grid cells
@@ -249,18 +257,21 @@ def count_particles(cfg, state):
     Returns:
     engl_w_sum: A 3D array with the sum of particle debris volume (particle["w"]) of englacial particles in each grid cell, sorted into vertical bins.
     """
+    # set state.particle["r"] of all particles where state.particle["thk"] == 0 to 0
+    state.particle["r"] = tf.where(state.particle["thk"] == 0, tf.zeros_like(state.particle["r"]), state.particle["r"])
     # Compute grid indices for all particles
     grid_particle_x = tf.cast(tf.floor(state.particle["x"] / state.dx), tf.int32)
     grid_particle_y = tf.cast(tf.floor(state.particle["y"] / state.dx), tf.int32)
     # Create depth bins for each pixel
-    depth_bins = tf.linspace(0.0, 1.0, cfg.processes.debris_cover.tracking.Nz + 1)
+    bin_bounds = [0, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 1.0]
+    depth_bins = tf.constant(bin_bounds, dtype=tf.float32)
 
     # Initialize a 3D array to hold the counts for each depth bin
-    engl_w_sum = tf.zeros((cfg.processes.debris_cover.tracking.Nz + 1,) + state.usurf.shape, dtype=tf.float32)
+    engl_w_sum = tf.zeros((len(bin_bounds) - 1,) + state.usurf.shape, dtype=tf.float32)
 
     # For each depth bin, mask and accumulate using tf ops
-    for k in range(cfg.processes.debris_cover.tracking.Nz + 1):
-        if k < cfg.processes.debris_cover.tracking.Nz:
+    for k in range(len(bin_bounds) - 1):
+        if k < len(bin_bounds) - 2:
             bin_mask = tf.logical_and(state.particle["r"] >= depth_bins[k], state.particle["r"] < depth_bins[k + 1])
         else:
             bin_mask = state.particle["r"] >= depth_bins[k]
@@ -323,7 +334,10 @@ def print_info_discrete(state):
             )
         if hasattr(state, "particle"):
             dic_postfix["# Particles"] = str(state.particle["x"].shape[0])
-
+        if hasattr(state, "surfdebvol"): 
+            dic_postfix["Supragl. debris volume"] = f"{state.surfdebvol} m³"
+            dic_postfix["Engl. debris volume"] = f"{state.engldebvol} m³"
+            dic_postfix["Off-glacier debris volume"] = f"{state.offgldebvol} m³"
         #        dic_postfix["💾 GPU Mem (MB)"] = tf.config.experimental.get_memory_info("GPU:0")['current'] / 1024**2
 
         state.pbar.set_postfix(dic_postfix)

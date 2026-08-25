@@ -110,8 +110,8 @@ def deb_particles(cfg, state):
         if cfg.processes.debris_cover.tracking.aggregate_immobile_particles and (state.t.numpy() - state.tlast_seeding) == 0:
             state = aggregate_immobile_particles(state)
         
-        # build moraines from off-glacier particles and feed back into basal topography
-        if cfg.processes.debris_cover.tracking.moraine_builder and (state.t.numpy() - state.tlast_mb) == 0:
+        # build moraines from off-glacier particles (optional: feed back into basal topography)
+        if (state.t.numpy() - state.tlast_mb) == 0:
             state = moraine_builder(cfg, state)
             
         if cfg.processes.debris_cover.tracking.latdiff_beta > 0:
