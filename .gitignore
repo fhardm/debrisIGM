@@ -2,6 +2,12 @@
 outputs/*
 multirun/*
 analysis/*
-experiment/exp_struct/*
+experiment/Belvedere/*
+experiment/Satopanth/*
+experiment/oggm_shop/*
+experiment/Zmutt/archive/*
+data/archive/*
+data/Belvedere/*
+data/Satopanth/*
 # ignore certain file types
-.pyc
+*.pyc
