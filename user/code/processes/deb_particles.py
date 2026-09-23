@@ -9,8 +9,8 @@ import time
 from igm.processes.particles.utils import get_weights_lagrange, get_weights_legendre
 
 from deb_seeding import seeding_particles
-from utils import aggregate_immobile_particles
-from utils import moraine_builder
+from debrisIGM_utils import aggregate_immobile_particles
+from debrisIGM_utils import moraine_builder
 from deb_processes import lateral_diffusion, lateral_diffusion_fixed
 
 
@@ -55,13 +55,13 @@ def deb_particles(cfg, state):
                     interpolate_particles_2d(state.U, state.V, WW, state.smb, state.thk, state.topg, indices)
 
         
-        if cfg.processes.iceflow.numerics.vert_basis in ["Lagrange","SIA"]:
+        if cfg.processes.iceflow.numerics.basis_vertical in ["Lagrange","SIA","molho"]:
             weights = get_weights_lagrange(
                 vert_spacing=cfg.processes.iceflow.numerics.vert_spacing,
                 Nz=cfg.processes.iceflow.numerics.Nz,
                 particle_r=state.particle["r"]
             )
-        elif cfg.processes.iceflow.numerics.vert_basis == "Legendre":
+        elif cfg.processes.iceflow.numerics.basis_vertical == "Legendre":
             weights = get_weights_legendre(state.particle["r"],cfg.processes.iceflow.numerics.Nz)
 
 

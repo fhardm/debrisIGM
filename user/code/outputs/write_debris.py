@@ -8,7 +8,7 @@ import os
 import time
 import tensorflow as tf
 import shutil
-from igm.utils.gradient import *
+from igm.utils.grad.grad import *
 from igm.utils.math import *
 
 

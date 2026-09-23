@@ -13,7 +13,7 @@ from deb_seeding import initialize_seeding
 from deb_particles import deb_particles
 from deb_smb_feedback import deb_thickness
 from deb_smb_feedback import deb_smb
-from utils import print_info_discrete
+from debrisIGM_utils import print_info_discrete
 from igm.common.utilities.printers import print_info
 
 def initialize(cfg, state):

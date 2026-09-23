@@ -14,9 +14,9 @@ from math_utils.compute_gradient_tf import compute_gradient_tf
 from math_utils.interp1d_tf import interp1d_tf
 from math_utils.interpolate_bilinear_tf import interpolate_bilinear_tf
 
-from utils import read_shapefile
-from utils import compute_mask_and_srcid
-from utils import read_seeding_points_from_csv
+from debrisIGM_utils import read_shapefile
+from debrisIGM_utils import compute_mask_and_srcid
+from debrisIGM_utils import read_seeding_points_from_csv
 
 def initialize_seeding(cfg, state):
     # initialize the debris variables
