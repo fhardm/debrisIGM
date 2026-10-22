@@ -1,5 +1,7 @@
 # ignore all outputs
 outputs/*
+user/doc/build/
+.vscode/*
 multirun/*
 analysis/*
 experiment/Belvedere/*

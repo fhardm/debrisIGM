@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "model_run": "015_random_forest_presence_by_category_100m_windows3_11_upstream_except_crevasse",
+  "training_glaciers": 50,
+  "grid_resolution_m": 100,
+  "predictors": [
+    "velocity_Millan2022",
+    "dStress",
+    "debris_thickness",
+    "slope_rad"
+  ],
+  "categories": [
+    "stream_influenced",
+    "pond_influenced",
+    "crevasse_originated",
+    "undefined"
+  ],
+  "presence_threshold": 0.5,
+  "probability_calibrators": {
+    "stream_influenced": {"intercept": -0.363762, "slope": 0.789387},
+    "pond_influenced": {"intercept": -0.668262, "slope": 1.063949},
+    "crevasse_originated": {"intercept": -1.161831, "slope": 0.656355},
+    "undefined": {"intercept": -0.575136, "slope": 0.717679}
+  },
+  "presence_correlation_range_m": {
+    "stream_influenced": 78.399083,
+    "pond_influenced": 81.262228,
+    "crevasse_originated": 152.235960,
+    "undefined": 70.368099
+  },
+  "fraction_magnitude_correlation_range_m": {
+    "stream_influenced": 60.329522,
+    "pond_influenced": 45.649627,
+    "crevasse_originated": 53.839381,
+    "undefined": 52.462550
+  },
+  "fraction_distributions": {
+    "stream_influenced": {"family": "two_component_truncated_exponential", "logit_weight": -0.881556, "rate_1": 103.277573, "rate_2": 15.035691},
+    "pond_influenced": {"family": "two_component_truncated_exponential", "logit_weight": -0.786199, "rate_1": 73.200426, "rate_2": 16.531039},
+    "crevasse_originated": {"family": "truncated_kumaraswamy", "a": 0.845178, "b": 5.808561},
+    "undefined": {"family": "truncated_generalized_gamma", "a": 5.852380, "c": 0.289917, "scale": 0.0000466583}
+  },
+  "random_seed": 19019,
+  "fraction_sum_policy": "rescale"
+}

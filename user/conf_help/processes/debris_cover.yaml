@@ -17,6 +17,15 @@ seeding:
     Type: list
     Units: mm per year
     Description: Debris input rate, definable per year as a list
+  particles_per_cell:
+    Type: int
+    Description: Number of particles seeded in each eligible grid cell
+  subcell_distribution:
+    Type: str
+    Description: Placement within each cell (center, random, or stratified)
+  random_seed:
+    Type: int
+    Description: Base seed for reproducible random and stratified subcell placement
   slope_threshold:
     Type: float
     Units: degrees
@@ -79,3 +88,64 @@ smb:
     Type: float
     Units: m
     Description: Compagno (2022) parameter for Oestrem curve
+  cliffs:
+    Type: bool
+    Description: Toggle consideration of supraglacial cliffs in the debris model
+  cliff_prediction:
+    backend:
+      Type: str
+      Description: run015 uses the four-predictor per-category classifier; legacy_three_predictor selects the previous three-feature regressor.
+    model_file:
+      Type: str
+      Description: Joblib run-015 classifier bundle, relative to user/code/processes or absolute.
+    parameters_file:
+      Type: str
+      Description: JSON file with calibration, covariance ranges, and fitted category fraction distributions.
+    presence_mode:
+      Type: str
+      Description: spatial_stochastic samples calibrated probabilities with a Gaussian-copula field; independent_stochastic disables presence correlation; threshold uses raw p >= 0.5.
+    presence_threshold:
+      Type: float
+      Description: Probability cutoff used when presence_mode is threshold.
+    probability_calibration:
+      Type: bool
+      Description: Apply training-only Platt calibration to the run-015 category probabilities.
+    presence_spatial_correlation:
+      Type: bool
+      Description: Apply the fitted category-specific spatial covariance to stochastic presence.
+    fraction_spatial_correlation:
+      Type: bool
+      Description: Apply fitted spatial covariance to positive category area-fraction magnitudes.
+    fraction_sum_policy:
+      Type: str
+      Description: rescale category fractions to sum to one, allow sums above one, or error on an overfull cell.
+    stress_predictor_source:
+      Type: str
+      Description: Use state.dStress, IGM driving stress from thickness and slope, or another named state array.
+    allow_surface_slope_fallback:
+      Type: bool
+      Description: Use surface downslope if IGM modeled velocity components are unavailable or too slow.
+    min_velocity_m_per_year:
+      Type: float
+      Description: Minimum smoothed flow speed before tracing falls back to surface slope.
+    velocity_smoothing_m:
+      Type: float
+      Units: m
+      Description: Gaussian smoothing length for flow-direction velocity components.
+    surface_smoothing_m:
+      Type: float
+      Units: m
+      Description: Gaussian smoothing length for surface elevation used by the direction fallback.
+    flowline_step_m:
+      Type: float
+      Units: m
+      Description: Step length used to integrate paths upglacier.
+    window_policy:
+      Type: str
+      Description: physical keeps approximately 300 m and 1100 m context windows at other grid sizes; fixed_cells always uses 3x3 and 11x11.
+    require_100m_grid:
+      Type: bool
+      Description: Require direct array API inputs to be 100 m; the IGM state adapter resamples predictors to 100 m and outputs back to the model grid.
+    random_seed:
+      Type: int
+      Description: Base seed for reproducible stochastic presence and area-fraction fields.

@@ -1,7 +1,7 @@
 # @package _global_
 
 defaults:
-  
+  - /user/conf/inputs@inputs.load_ncdf: load_ncdf
   - /user/conf/processes@processes.smb_aspect: smb_aspect
 
   - override /inputs:
@@ -31,7 +31,7 @@ inputs:
   load_ncdf:
     input_file: input_Zmutt_50m_new.nc
     icemask_include: true
-    icemask_shapefile: /home/florian/debrisIGM/data/icemask_Zmutt.shp # change this to a path in your directory
+    icemask_shapefile: icemask_Zmutt.shp # change this to a path in your directory
     icemask_invert: true
     crop: true
     xmin: 389000
@@ -40,6 +40,11 @@ inputs:
     ymax: 5100100
 
 processes:
+  iceflow:
+    vertical_velocity:
+      enabled: true
+      version: 2
+      method: kinematic
   smb_aspect:
     array:
       - ["time", "gradabl", "gradacc", "ela", "accmax"]

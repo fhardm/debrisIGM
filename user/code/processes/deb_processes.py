@@ -100,7 +100,11 @@ def initial_rockfall_simple(cfg, state):
     iteration_count = 0
     max_iterations = tf.cast(1000.0 / state.dx, tf.int32)  # Maximum number of iterations to prevent infinite loop
 
-    # Initial positions of the particles
+    # Track each particle's cell and preserve its offset from that cell center.
+    cell_i = tf.cast(tf.round(state.nparticle["x"] / state.dx), tf.int32)
+    cell_j = tf.cast(tf.round(state.nparticle["y"] / state.dx), tf.int32)
+    offset_x = state.nparticle["x"] - tf.cast(cell_i, state.nparticle["x"].dtype) * state.dx
+    offset_y = state.nparticle["y"] - tf.cast(cell_j, state.nparticle["y"].dtype) * state.dx
     initx = state.nparticle["x"]
     inity = state.nparticle["y"]
     
@@ -111,8 +115,8 @@ def initial_rockfall_simple(cfg, state):
     moving_particles_any = tf.reduce_any(moving_particles)
 
     while moving_particles_any and iteration_count < max_iterations:
-        i = tf.cast(state.nparticle["x"] / state.dx, tf.int32)
-        j = tf.cast(state.nparticle["y"] / state.dx, tf.int32)
+        i = tf.clip_by_value(cell_i, 0, tf.shape(state.slope_rad)[1] - 1)
+        j = tf.clip_by_value(cell_j, 0, tf.shape(state.slope_rad)[0] - 1)
 
         # Update moving_particles mask (remove particles that have reached a slope lower than the threshold in the previous iteration)
         slope_values = tf.gather_nd(state.slope_rad, tf.stack([j, i], axis=-1))
@@ -121,11 +125,25 @@ def initial_rockfall_simple(cfg, state):
         if tf.reduce_any(moving_particles):
             # Move particles along the aspect direction
             aspect_values = tf.gather_nd(aspect_rounded, tf.stack([j, i], axis=-1))
-            state.nparticle["x"] = tf.where(moving_particles, state.nparticle["x"] + tf.round(tf.math.sin(aspect_values)) * state.dx, state.nparticle["x"])
-            state.nparticle["y"] = tf.where(moving_particles, state.nparticle["y"] + tf.round(tf.math.cos(aspect_values)) * state.dx, state.nparticle["y"])
+            step_i = tf.cast(tf.round(tf.math.sin(aspect_values)), tf.int32)
+            step_j = tf.cast(tf.round(tf.math.cos(aspect_values)), tf.int32)
+            cell_i = tf.where(
+                moving_particles,
+                tf.clip_by_value(cell_i + step_i, 0, tf.shape(state.slope_rad)[1] - 1),
+                cell_i,
+            )
+            cell_j = tf.where(
+                moving_particles,
+                tf.clip_by_value(cell_j + step_j, 0, tf.shape(state.slope_rad)[0] - 1),
+                cell_j,
+            )
+            state.nparticle["x"] = tf.cast(cell_i, state.nparticle["x"].dtype) * state.dx + offset_x
+            state.nparticle["y"] = tf.cast(cell_j, state.nparticle["y"].dtype) * state.dx + offset_y
             # Ensure particles remain within the domain
             state.nparticle["x"] = tf.clip_by_value(state.nparticle["x"], 0, state.x[-1] - state.x[0])
             state.nparticle["y"] = tf.clip_by_value(state.nparticle["y"], 0, state.y[-1] - state.y[0])
+            offset_x = state.nparticle["x"] - tf.cast(cell_i, state.nparticle["x"].dtype) * state.dx
+            offset_y = state.nparticle["y"] - tf.cast(cell_j, state.nparticle["y"].dtype) * state.dx
         moving_particles_any = tf.reduce_any(moving_particles)
         iteration_count += 1
 
@@ -159,6 +177,11 @@ def initial_rockfall_simple(cfg, state):
             )[0, :, 0]
     state.nparticle["thk"] = interpolate_bilinear_tf(
             tf.expand_dims(tf.expand_dims(state.thk, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+    state.nparticle["topg"] = interpolate_bilinear_tf(
+            tf.expand_dims(tf.expand_dims(state.topg, axis=0), axis=-1),
             indices,
             indexing="ij",
         )[0, :, 0]

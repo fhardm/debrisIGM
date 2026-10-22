@@ -3,3 +3,5 @@ from .debris_cover import (
     finalize,
     update
 )
+
+from .cliff_prediction import predict_cliff_area_fractions, predict_from_state

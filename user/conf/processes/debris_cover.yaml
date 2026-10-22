@@ -5,6 +5,9 @@ seeding:
   delay: 50
   frequency: 1
   density: []
+  particles_per_cell: 1
+  subcell_distribution: center
+  random_seed: 19019
   slope_threshold: 45
   thk_threshold: 20
   smb_threshold: -9999
@@ -27,3 +30,24 @@ smb:
   h_eff: 0.016
   h_crit: 0.036
   k_debris: 0.03
+  cliffs: false
+  cliff_smb_enhancement: 1.0
+  cliff_prediction:
+    backend: run015
+    model_file: cliff_prediction_models.joblib
+    parameters_file: cliff_prediction_parameters.json
+    presence_mode: spatial_stochastic
+    probability_calibration: true
+    presence_spatial_correlation: true
+    fraction_spatial_correlation: true
+    fraction_sum_policy: rescale
+    allow_surface_slope_fallback: true
+    window_policy: physical
+    require_100m_grid: true
+    presence_threshold: 0.5
+    min_velocity_m_per_year: 1.0
+    velocity_smoothing_m: 100.0
+    surface_smoothing_m: 150.0
+    flowline_step_m: 50.0
+    random_seed: 19019
+    stress_predictor_source: driving_stress

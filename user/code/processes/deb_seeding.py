@@ -38,6 +38,14 @@ def initialize_seeding(cfg, state):
     state.engldebvol = tf.Variable([0], dtype=tf.float32)
     state.offgldebvol = tf.Variable([0], dtype=tf.float32)
     
+    if cfg.processes.debris_cover.smb.cliffs:
+        state.cliffs_s = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+        state.cliffs_p = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+        state.cliffs_c = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+        state.cliffs_u = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+        state.cliffs_total = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+        state.tau_d = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+    
     state.tlast_seeding = -1.0e5000
     state.tcomp_particles = []
     state.particle_counter = tf.Variable([0], dtype=tf.float64)
@@ -303,10 +311,6 @@ def seeding_particles(cfg, state):
     else:
         # Seeding
         I = state.gridseed # conditions for seeding area: where thk > 0, smb > -2 and gridseed (defined in initialize) is True
-        num_new_particles = tf.reshape(tf.cast(tf.size(tf.boolean_mask(state.X, I)), tf.float64), [1])
-        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float64)
-        state.particle_counter.assign_add(num_new_particles)
-
         X_I = tf.boolean_mask(state.X, I)
         Y_I = tf.boolean_mask(state.Y, I)
         usurf_I = tf.boolean_mask(state.usurf, I)
@@ -314,23 +318,58 @@ def seeding_particles(cfg, state):
         topg_I = tf.boolean_mask(state.topg, I)
         srcid_I = tf.boolean_mask(state.srcid, I)
         vpp_I = tf.boolean_mask(state.volume_per_particle, I)
+        subcell_offsets, particles_per_cell, distribution = _subcell_offsets(
+            cfg, state, int(tf.size(X_I).numpy())
+        )
+        n_cells = tf.shape(X_I)[0]
+        cell_x = X_I - state.x[0]
+        cell_y = Y_I - state.y[0]
+        if distribution == "center":
+            offset_x = tf.zeros_like(subcell_offsets[:, :, 0])
+            offset_y = tf.zeros_like(subcell_offsets[:, :, 1])
+        else:
+            min_offset_x = tf.maximum(-0.5 * state.dx, -cell_x)
+            max_offset_x = tf.minimum(0.5 * state.dx, state.x[-1] - state.x[0] - cell_x)
+            min_offset_y = tf.maximum(-0.5 * state.dx, -cell_y)
+            max_offset_y = tf.minimum(0.5 * state.dx, state.y[-1] - state.y[0] - cell_y)
+            offset_x = min_offset_x[:, tf.newaxis] + (subcell_offsets[:, :, 0] + 0.5) * (
+                max_offset_x - min_offset_x
+            )[:, tf.newaxis]
+            offset_y = min_offset_y[:, tf.newaxis] + (subcell_offsets[:, :, 1] + 0.5) * (
+                max_offset_y - min_offset_y
+            )[:, tf.newaxis]
+
+        particle_x = tf.repeat(cell_x, particles_per_cell) + tf.reshape(offset_x, [-1])
+        particle_y = tf.repeat(cell_y, particles_per_cell) + tf.reshape(offset_y, [-1])
+        num_new_particles = tf.reshape(tf.cast(n_cells * particles_per_cell, tf.float64), [1])
+        state.nparticle["ID"] = tf.range(state.particle_counter + 1, state.particle_counter + num_new_particles + 1, dtype=tf.float64)
+        state.particle_counter.assign_add(num_new_particles)
+
+        particle_indices = tf.expand_dims(
+            tf.stack([particle_y / state.dx, particle_x / state.dx], axis=-1), axis=0
+        )
+        particle_z = interpolate_bilinear_tf(
+            tf.expand_dims(tf.expand_dims(state.usurf, axis=0), axis=-1),
+            particle_indices,
+            indexing="ij",
+        )[0, :, 0]
 
         attributes_values = {
             "ID": state.nparticle["ID"],
-            "x": X_I - state.x[0],
-            "y": Y_I - state.y[0],
-            "z": usurf_I,
-            "r": tf.ones_like(X_I),
-            "w": tf.ones_like(X_I) * vpp_I,
-            "t": tf.ones_like(X_I) * state.t,
-            "englt": tf.zeros_like(X_I),
-            "thk": thk_I,
-            "topg": topg_I,
-            "srcid": srcid_I,
-            "vel": tf.zeros_like(X_I),  # initial velocity set to zero
-            "latdiff_x": tf.zeros_like(X_I),  # initial lateral displacement velocity set to zero
-            "latdiff_y": tf.zeros_like(X_I),
-            "partsum": tf.ones_like(X_I)
+            "x": particle_x,
+            "y": particle_y,
+            "z": particle_z,
+            "r": tf.ones_like(particle_x),
+            "w": tf.repeat(vpp_I / particles_per_cell, particles_per_cell),
+            "t": tf.ones_like(particle_x) * state.t,
+            "englt": tf.zeros_like(particle_x),
+            "thk": tf.repeat(thk_I, particles_per_cell),
+            "topg": tf.repeat(topg_I, particles_per_cell),
+            "srcid": tf.repeat(srcid_I, particles_per_cell),
+            "vel": tf.zeros_like(particle_x),  # initial velocity set to zero
+            "latdiff_x": tf.zeros_like(particle_x),  # initial lateral displacement velocity set to zero
+            "latdiff_y": tf.zeros_like(particle_x),
+            "partsum": tf.ones_like(particle_x)
         }
 
         for attr in state.particle_attributes:
@@ -339,8 +378,6 @@ def seeding_particles(cfg, state):
         # Calculate the amount of seeded particles (per year)
         state.seeding_instances = state.seeding_instances + 1
         state.seeded_particles = tf.cast(tf.size(state.nparticle["x"]), tf.float32) / cfg.processes.debris_cover.seeding.frequency
-        # Calculate the sum of seeded debris volume (per year)
-        state.seeded_debris_volume = tf.reduce_sum(state.nparticle["w"]) / cfg.processes.debris_cover.seeding.frequency
 
         if cfg.processes.debris_cover.seeding.initial_rockfall == "default":
             from deb_processes import initial_rockfall
@@ -350,8 +387,48 @@ def seeding_particles(cfg, state):
             state = initial_rockfall(cfg, state)
 
         if cfg.processes.debris_cover.seeding.type == "slope_highres":
-            state.nparticle["w"] = state.nparticle["w"] * tf.boolean_mask(state.gridseed_fraction, I) # adjust the weight of the particle based on the fraction of the grid cell area inside the polygons
+            cell_fraction = tf.boolean_mask(state.gridseed_fraction, I)
+            state.nparticle["w"] = state.nparticle["w"] * tf.repeat(cell_fraction, particles_per_cell) # adjust for the fraction of each cell inside the polygons
+
+        # Calculate the sum of seeded debris volume (per year)
+        state.seeded_debris_volume = tf.reduce_sum(state.nparticle["w"]) / cfg.processes.debris_cover.seeding.frequency
 
     # Ensure particle positions remain within the grid boundaries
     state.nparticle["x"] = tf.clip_by_value(state.nparticle["x"], 0, state.x[-1] - state.x[0])
     state.nparticle["y"] = tf.clip_by_value(state.nparticle["y"], 0, state.y[-1] - state.y[0])
+    
+
+
+def _subcell_offsets(cfg, state, n_cells):
+    n_particles = int(cfg.processes.debris_cover.seeding.particles_per_cell)
+    distribution = cfg.processes.debris_cover.seeding.subcell_distribution
+    seed = int(cfg.processes.debris_cover.seeding.random_seed)
+    if n_particles < 1:
+        raise ValueError("seeding.particles_per_cell must be at least 1")
+    if distribution not in ("center", "random", "stratified"):
+        raise ValueError("seeding.subcell_distribution must be center, random, or stratified")
+    if seed < 0:
+        raise ValueError("seeding.random_seed must be non-negative")
+    # all particles remain on the cell center
+    if distribution == "center":
+        offsets = tf.zeros((n_cells, n_particles, 2), dtype=tf.float32)
+    # particles are randomly distributed within the cell
+    elif distribution == "random":
+        event_seed = int(state.particle_counter.numpy()[0]) % (2**31 - 1)
+        offsets = tf.random.stateless_uniform(
+            (n_cells, n_particles, 2),
+            seed=(seed, event_seed),
+            minval=-0.5,
+            maxval=0.5,
+            dtype=tf.float32,
+        )
+    # particles are stratified within the cell
+    else:
+        rng = np.random.default_rng(seed)
+        x_offsets = (np.arange(n_particles, dtype=np.float32) + 0.5) / n_particles - 0.5
+        y_offsets = (rng.permutation(n_particles).astype(np.float32) + 0.5) / n_particles - 0.5
+        offsets = tf.tile(
+            tf.constant(np.stack([x_offsets, y_offsets], axis=-1))[tf.newaxis, :, :],
+            (n_cells, 1, 1),
+        )
+    return offsets, n_particles, distribution
