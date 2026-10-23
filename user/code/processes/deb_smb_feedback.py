@@ -71,29 +71,45 @@ def cliff_deb_smb(cfg, state):
     if backend != "run015":
         raise ValueError(f"Unknown cliff prediction backend: {backend}")
 
-    state.tau_d = cfg.processes.iceflow.physics.ice_density * cfg.processes.iceflow.physics.gravity_cst * state.thk * tf.sin(state.slope_rad)
+    dtype = state.thk.dtype
+    dx = tf.cast(state.dx, dtype)
+    ice_density = tf.cast(cfg.processes.iceflow.physics.ice_density, dtype)
+    gravity = tf.cast(cfg.processes.iceflow.physics.gravity_cst, dtype)
+    state.tau_d = ice_density * gravity * state.thk * tf.sin(
+        tf.cast(state.slope_rad, dtype)
+    )
     state.tau_d = tf.nn.avg_pool2d(
         state.tau_d[None, :, :, None], ksize=3, strides=1, padding="SAME"
     )[0, :, :, 0]
     prediction = predict_from_state(cfg, state)
     for attribute, index in (("cliffs_s", 0), ("cliffs_p", 1), ("cliffs_c", 2), ("cliffs_u", 3)):
-        value = tf.convert_to_tensor(prediction["category_fractions"][:, :, index], dtype=state.thk.dtype)
+        value = tf.cast(
+            tf.convert_to_tensor(prediction["category_fractions"][:, :, index]),
+            dtype,
+        )
         target = getattr(state, attribute, None)
         if hasattr(target, "assign"):
-            target.assign(value)
+            target.assign(tf.cast(value, target.dtype))
         else:
             setattr(state, attribute, tf.Variable(value, trainable=False))
-    total = tf.convert_to_tensor(prediction["total_fraction"], dtype=state.thk.dtype)
-    if hasattr(state.cliffs_total, "assign"):
-        state.cliffs_total.assign(total)
-    else:
-        state.cliffs_total = tf.Variable(total, trainable=False)
-    state.cliff_presence_probability = tf.convert_to_tensor(
-        prediction["probability_calibrated"], dtype=state.thk.dtype
+    total = tf.cast(tf.convert_to_tensor(prediction["total_fraction"]), dtype)
+    dx_squared = tf.square(dx)
+    state.cliff_area_total = tf.reduce_sum(total) * dx_squared
+    debris_covered_area = (
+        tf.reduce_sum(tf.cast(state.debthick > 0, dtype)) * dx_squared
     )
-    state.cliff_presence = tf.convert_to_tensor(prediction["presence"], dtype=tf.bool)
-    state.cliff_prediction_probability_raw = tf.convert_to_tensor(
-        prediction["probability_raw"], dtype=state.thk.dtype
+    state.cliff_area_deb_fraction = tf.math.divide_no_nan(
+        state.cliff_area_total, debris_covered_area
+    )
+    state.cliffs_total.assign(tf.cast(total, state.cliffs_total.dtype))
+    state.cliff_presence_probability = tf.cast(
+        tf.convert_to_tensor(prediction["probability_calibrated"]), dtype
+    )
+    state.cliff_presence = tf.cast(
+        tf.convert_to_tensor(prediction["presence"]), tf.bool
+    )
+    state.cliff_prediction_probability_raw = tf.cast(
+        tf.convert_to_tensor(prediction["probability_raw"]), dtype
     )
     return state
 
@@ -109,7 +125,12 @@ def _cliff_deb_smb_legacy(cfg, state):
     else:
         feature_cols, cliff_type_models = _cliff_model_data
         
-    state.tau_d = cfg.processes.iceflow.physics.ice_density * cfg.processes.iceflow.physics.gravity_cst * state.thk * tf.sin(state.slope_rad)
+    dtype = state.thk.dtype
+    ice_density = tf.cast(cfg.processes.iceflow.physics.ice_density, dtype)
+    gravity = tf.cast(cfg.processes.iceflow.physics.gravity_cst, dtype)
+    state.tau_d = ice_density * gravity * state.thk * tf.sin(
+        tf.cast(state.slope_rad, dtype)
+    )
     tau_kernel_size = 3 # kernel size for averaging over a 3x3 neighborhood
     state.tau_d = tf.nn.avg_pool2d(
         state.tau_d[None, :, :, None],
@@ -174,7 +195,9 @@ def predict_cliff_densities(predictors, total_cliff_fraction,
     """
 
     predictors = tf.convert_to_tensor(predictors)
-    total_cliff_fraction = tf.convert_to_tensor(total_cliff_fraction, dtype=predictors.dtype)
+    total_cliff_fraction = tf.cast(
+        tf.convert_to_tensor(total_cliff_fraction), predictors.dtype
+    )
     if predictors.shape.rank != 3:
         raise ValueError("predictors must have shape (rows, columns, n_features).")
     if total_cliff_fraction.shape.rank != 2:
@@ -192,8 +215,8 @@ def predict_cliff_densities(predictors, total_cliff_fraction,
     result = {}
     fraction_predictions = []
     for cliff_type, model in cliff_type_models.items():
-        fraction_prediction = tf.convert_to_tensor(
-            model.predict(X_new), dtype=predictors.dtype
+        fraction_prediction = tf.cast(
+            tf.convert_to_tensor(model.predict(X_new)), predictors.dtype
         )
         fraction_grid = tf.reshape(fraction_prediction, grid_shape)
         result[f'{cliff_type}_fraction_pred'] = fraction_grid

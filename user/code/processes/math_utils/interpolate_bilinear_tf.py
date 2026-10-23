@@ -1,7 +1,17 @@
 import tensorflow as tf
 
-@tf.function
 def interpolate_bilinear_tf(
+    grid: tf.Tensor,
+    query_points: tf.Tensor,
+    indexing: str = "ij",
+) -> tf.Tensor:
+    grid = tf.convert_to_tensor(grid)
+    query_points = tf.cast(tf.convert_to_tensor(query_points), grid.dtype)
+    return _interpolate_bilinear_tf(grid, query_points, indexing)
+
+
+@tf.function(reduce_retracing=True)
+def _interpolate_bilinear_tf(
     grid: tf.Tensor,
     query_points: tf.Tensor,
     indexing: str = "ij",
