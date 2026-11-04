@@ -62,14 +62,12 @@ def deb_smb(cfg, state):
     return state
 
 def cliff_deb_smb(cfg, state):
-    # Determine which backend to use for cliff debris-SMB prediction based on configuration
+    # The model artifact, rather than a separate mode flag, selects the predictor.
     smb_options = cfg.processes.debris_cover.smb
     options = smb_options.get("cliff_prediction", None) if hasattr(smb_options, "get") else getattr(smb_options, "cliff_prediction", None)
-    backend = getattr(options, "backend", "run015") if options is not None else "run015"
-    if backend == "legacy_three_predictor":
-        return _cliff_deb_smb_legacy(cfg, state)
-    if backend != "run015":
-        raise ValueError(f"Unknown cliff prediction backend: {backend}")
+    model_file = (getattr(options, "model_file", None) if options is not None else None) or "cliff_prediction_models.joblib"
+    if os.path.basename(os.fspath(model_file)) == "cliff_type_models.joblib":
+        return _cliff_deb_smb_legacy(cfg, state, model_file)
 
     dtype = state.thk.dtype
     dx = tf.cast(state.dx, dtype)
@@ -114,10 +112,11 @@ def cliff_deb_smb(cfg, state):
     return state
 
 
-def _cliff_deb_smb_legacy(cfg, state):
+def _cliff_deb_smb_legacy(cfg, state, model_file="cliff_type_models.joblib"):
     # Load the feature ordering and fitted models used by the cliff-density model.
+    model_path = model_file if os.path.isabs(model_file) else os.path.join(os.path.dirname(__file__), model_file)
     _cliff_model_data = joblib.load(
-        os.path.join(os.path.dirname(__file__), "cliff_type_models.joblib")
+        model_path
     )
     if isinstance(_cliff_model_data, dict):
         feature_cols = _cliff_model_data["feature_cols"]

@@ -399,8 +399,27 @@ def upstream_features(stack, centers, flow_vx, flow_vy, surface_elevation, glaci
     return np.stack(columns, axis=1).astype(np.float32)
 
 
+def model_requires_upstream_features(model_bundle):
+    if "window_sizes_by_category" in model_bundle:
+        flags = model_bundle.get("include_upstream_by_category")
+        if flags is not None:
+            return any(bool(value) for value in flags.values())
+        return any(bool(entry.get("include_upstream", False))
+                   for entry in model_bundle.get("models", {}).values())
+    local_feature_count = len(PREDICTORS) * 5
+    feature_names = model_bundle.get("feature_names", ())
+    for entry in model_bundle.get("models", {}).values():
+        columns = np.asarray(
+            entry.get("columns", np.arange(len(feature_names))), dtype=int
+        )
+        if np.any(columns >= local_feature_count):
+            return True
+    return False
+
+
 def assemble_features(predictor_arrays, centers, flow_vx, flow_vy, surface_elevation,
-                      glacier_mask, cell_size_m, x_axis_sign, y_axis_sign, options):
+                      glacier_mask, cell_size_m, x_axis_sign, y_axis_sign, options,
+                      include_upstream=True, expected_feature_count=None):
     stack = np.stack([predictor_arrays[name] for name in PREDICTORS])
     if get_config_value(options, "window_policy", "physical") == "physical":
         windows = (3, 11) if np.isclose(cell_size_m, 100.0) else (
@@ -410,12 +429,69 @@ def assemble_features(predictor_arrays, centers, flow_vx, flow_vy, surface_eleva
         windows = (3, 11)
     center_small, mean_small, std_small = window_features(stack, centers, windows[0])
     _, mean_large, std_large = window_features(stack, centers, windows[1])
-    # This concatenation must match run-015's saved feature_names exactly.
-    # Preserve run-015's ordering: 3x3 center/mean/std, 11x11 mean/std, then upstream groups.
+    # Preserve the saved ordering: 3x3 center/mean/std, 11x11 mean/std, then upstream groups.
     local = np.concatenate([center_small, mean_small, std_small, mean_large, std_large], axis=1)
-    upstream = upstream_features(stack, centers, flow_vx, flow_vy, surface_elevation,
-                                 glacier_mask, cell_size_m, x_axis_sign, y_axis_sign, options)
+    if include_upstream:
+        upstream = upstream_features(
+            stack, centers, flow_vx, flow_vy, surface_elevation, glacier_mask,
+            cell_size_m, x_axis_sign, y_axis_sign, options,
+        )
+    else:
+        upstream_width = (
+            expected_feature_count - local.shape[1]
+            if expected_feature_count is not None
+            else len(PREDICTORS) * len(DISTANCES_M) * 4
+        )
+        if upstream_width < 0:
+            raise ValueError("Expected feature count is smaller than the local feature set")
+        upstream = np.full((len(centers), upstream_width), np.nan, dtype=np.float32)
     return np.concatenate([local, upstream], axis=1)
+
+
+def assemble_category_features(predictor_arrays, centers, flow_vx, flow_vy, surface_elevation,
+                               glacier_mask, cell_size_m, x_axis_sign, y_axis_sign, options,
+                               model_bundle):
+    """Build each category's saved window/predictor schema, with optional upstream blocks."""
+    features_by_category = {}
+    upstream_cache = {}
+    for category in CATEGORIES:
+        entry = model_bundle["models"][category]
+        predictor_names = tuple(entry.get("predictors", PREDICTORS))
+        missing = [name for name in predictor_names if name not in predictor_arrays]
+        if missing:
+            raise ValueError(f"Missing predictors for {category}: {missing}")
+        stack = np.stack([predictor_arrays[name] for name in predictor_names])
+        windows = tuple(entry.get("window_sizes", ()))
+        if not windows:
+            raise ValueError(f"No window_sizes saved for category-specific model {category}")
+
+        local_blocks = []
+        for index, size in enumerate(windows):
+            center, mean, std = window_features(stack, centers, int(size))
+            local_blocks.append(np.concatenate([center, mean, std], axis=1)
+                                if index == 0 else np.concatenate([mean, std], axis=1))
+        category_features = np.concatenate(local_blocks, axis=1)
+
+        include_upstream = bool(entry.get(
+            "include_upstream",
+            model_bundle.get("include_upstream_by_category", {}).get(category, False),
+        ))
+        if include_upstream:
+            cache_key = predictor_names
+            if cache_key not in upstream_cache:
+                upstream_cache[cache_key] = upstream_features(
+                    stack, centers, flow_vx, flow_vy, surface_elevation, glacier_mask,
+                    cell_size_m, x_axis_sign, y_axis_sign, options,
+                )
+            category_features = np.concatenate([category_features, upstream_cache[cache_key]], axis=1)
+
+        expected_width = len(entry["imputation_medians"])
+        if category_features.shape[1] != expected_width:
+            raise ValueError(
+                f"Feature width for {category} is {category_features.shape[1]}; model expects {expected_width}"
+            )
+        features_by_category[category] = category_features.astype(np.float32, copy=False)
+    return features_by_category
 
 
 @lru_cache(maxsize=64)
@@ -503,6 +579,8 @@ def apply_sum_policy(fractions, policy):
 
 def validate_predictor_arrays(predictors):
     arrays = {name: as_2d_array(predictors.get(name), name) for name in PREDICTORS}
+    if predictors.get("elevation_AW3D") is not None:
+        arrays["elevation_AW3D"] = as_2d_array(predictors["elevation_AW3D"], "elevation_AW3D")
     missing = [name for name, value in arrays.items() if value is None]
     if missing:
         raise ValueError(f"Missing cliff predictors: {missing}")
@@ -513,13 +591,18 @@ def validate_predictor_arrays(predictors):
 
 
 def predict_probabilities(feature_matrix, model_bundle, parameters, calibrate=True):
-    raw = np.zeros((len(feature_matrix), len(CATEGORIES)), dtype=np.float32)
+    n_rows = len(next(iter(feature_matrix.values()))) if isinstance(feature_matrix, dict) else len(feature_matrix)
+    raw = np.zeros((n_rows, len(CATEGORIES)), dtype=np.float32)
     calibrated = np.zeros_like(raw)
     for index, category in enumerate(CATEGORIES):
         entry = model_bundle["models"][category]
+        category_features = feature_matrix[category] if isinstance(feature_matrix, dict) else feature_matrix
         # Crevasse has a smaller saved feature subset; use that model's training-time columns.
-        columns = np.asarray(entry.get("columns", np.arange(len(model_bundle["feature_names"]))), dtype=int)
-        values = feature_matrix[:, columns]
+        columns = entry.get("columns")
+        if columns is None:
+            columns = np.arange(len(model_bundle["feature_names"]))
+        columns = np.asarray(columns, dtype=int)
+        values = category_features[:, columns]
         medians = np.asarray(entry["imputation_medians"], dtype=np.float32)
         values = np.where(np.isfinite(values), values, medians).astype(np.float32)
         model = entry["model"]

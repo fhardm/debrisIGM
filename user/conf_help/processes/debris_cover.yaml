@@ -92,12 +92,9 @@ smb:
     Type: bool
     Description: Toggle consideration of supraglacial cliffs in the debris model
   cliff_prediction:
-    backend:
-      Type: str
-      Description: run015 uses the four-predictor per-category classifier; legacy_three_predictor selects the previous three-feature regressor.
     model_file:
       Type: str
-      Description: Joblib run-015 classifier bundle, relative to user/code/processes or absolute.
+      Description: Joblib classifier bundle; selects run015/run016/run039/run041 or the legacy cliff_type_models.joblib, relative to user/code/processes or absolute.
     parameters_file:
       Type: str
       Description: JSON file with calibration, covariance ranges, and fitted category fraction distributions.
@@ -109,7 +106,7 @@ smb:
       Description: Probability cutoff used when presence_mode is threshold.
     probability_calibration:
       Type: bool
-      Description: Apply training-only Platt calibration to the run-015 category probabilities.
+      Description: Apply the run-015 Platt calibrators. Run039/run041 have no matching calibrators and reject true.
     presence_spatial_correlation:
       Type: bool
       Description: Apply the fitted category-specific spatial covariance to stochastic presence.
