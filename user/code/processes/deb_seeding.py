@@ -47,6 +47,7 @@ def initialize_seeding(cfg, state):
         state.cliff_area_total = tf.Variable([0], dtype=tf.float64)
         state.cliff_area_deb_fraction = tf.Variable([0], dtype=tf.float64)
         state.tau_d = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
+        state.cliff_smb_effect = tf.Variable(tf.zeros_like(state.usurf, dtype=tf.float32))
     
     state.tlast_seeding = -1.0e5000
     state.tcomp_particles = []

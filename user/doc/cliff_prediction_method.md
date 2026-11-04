@@ -259,7 +259,7 @@ $$
 +\mathrm{SMB}_{\rm clean}f_{\rm cliff}\,E_{\rm cliff},
 $$
 
-where $f_{\rm cliff}$ is the predicted total area fraction and $E_{\rm cliff}$ is `cliff_smb_enhancement`. The old three-predictor regressor can be selected by setting `model_file` to `cliff_type_models.joblib`.
+where $f_{\rm cliff}$ is the predicted total area fraction and $E_{\rm cliff}=1+4.33\,e^{-24.5x}$ is the enhancement factor, with $x=\mathrm{SMB}_{\rm clean}/80$. The old three-predictor regressor can be selected by setting `model_file` to `cliff_type_models.joblib`.
 
 ## Configuration
 
