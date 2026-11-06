@@ -59,7 +59,7 @@ def deb_smb(cfg, state):
             if cfg.processes.debris_cover.smb.cliffs:
                 cliff_deb_smb(cfg, state)
                 melt_rate_clean = smb_clean / 80.0
-                cliff_smb_ef = 1.0 + 4.33 * tf.exp(-24.5 * melt_rate_clean)
+                cliff_smb_ef = 1.0 + 4.33 * tf.exp(24.5 * melt_rate_clean)
                 state.smb = state.smb * (1 - state.cliffs_total) + smb_clean * state.cliffs_total * cliff_smb_ef
                 state.cliff_smb_effect = smb_clean * state.cliffs_total * cliff_smb_ef
     return state

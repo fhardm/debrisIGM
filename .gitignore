@@ -5,11 +5,9 @@ user/doc/build/
 multirun/*
 analysis/*
 experiment/Belvedere/*
-experiment/Satopanth/*
 experiment/oggm_shop/*
 experiment/Zmutt/archive/*
 data/archive/*
 data/Belvedere/*
-data/Satopanth/*
 # ignore certain file types
 *.pyc
